@@ -74,6 +74,10 @@ CREATE TABLE users (
     coin_balance INTEGER DEFAULT 0 CHECK (coin_balance >= 0),
     gift_balance DECIMAL(10, 2) DEFAULT 0.00 CHECK (gift_balance >= 0),
     
+    -- Onboarding Progress
+    onboarding_step INTEGER DEFAULT 0 CHECK (onboarding_step >= 0 AND onboarding_step <= 8),
+    onboarding_completed BOOLEAN DEFAULT FALSE,
+    
     -- Metadata
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

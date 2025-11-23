@@ -283,16 +283,22 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 	}
 	log.Printf("✅ JWT tokens generated successfully")
 
-	// 5. Return Response
-	log.Printf("✅ Login successful for user ID: %s, TelegramID: %d", user.ID, user.TelegramID)
+	// 5. Check onboarding status
+	hasProfile := user.City != "" && user.City != "Not Set"
+	
+	// 6. Return Response
+	log.Printf("✅ Login successful for user ID: %s, TelegramID: %d, OnboardingStep: %d, Completed: %v", 
+		user.ID, user.TelegramID, user.OnboardingStep, user.OnboardingCompleted)
 	response := fiber.Map{
 		"access_token":  tokens.AccessToken,
 		"refresh_token": tokens.RefreshToken,
 		"user": fiber.Map{
-			"id":          user.ID,
-			"name":        user.Name,
-			"is_verified": user.IsVerified,
-			"has_profile": user.City != "" && user.City != "Not Set", // Simple check if onboarding is done
+			"id":                  user.ID,
+			"name":                user.Name,
+			"is_verified":         user.IsVerified,
+			"has_profile":         hasProfile,
+			"onboarding_step":     user.OnboardingStep,
+			"onboarding_completed": user.OnboardingCompleted,
 		},
 	}
 	return c.JSON(response)
@@ -559,13 +565,17 @@ func (h *AuthHandler) TelegramWidgetLogin(c *fiber.Ctx) error {
 	}
 	
 	// Encode tokens in URL hash (more secure than query params)
-	redirectURL := fmt.Sprintf("%s/#access_token=%s&refresh_token=%s&user_id=%s",
+	// Include onboarding status in redirect
+	redirectURL := fmt.Sprintf("%s/#access_token=%s&refresh_token=%s&user_id=%s&onboarding_step=%d&onboarding_completed=%v",
 		frontendURL,
 		tokens.AccessToken,
 		tokens.RefreshToken,
 		user.ID.String(),
+		user.OnboardingStep,
+		user.OnboardingCompleted,
 	)
 	
-	log.Printf("✅ Widget login successful, redirecting to: %s", frontendURL)
+	log.Printf("✅ Widget login successful, redirecting to: %s (onboarding_step=%d)", 
+		frontendURL, user.OnboardingStep)
 	return c.Redirect(redirectURL, fiber.StatusFound)
 }

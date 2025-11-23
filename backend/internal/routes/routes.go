@@ -48,6 +48,10 @@ func SetupRoutes(app *fiber.App) {
 	protected.Put("/users/me", handlers.UpdateProfile)
 	protected.Get("/users", handlers.GetAllUsers) // List all users (for testing)
 
+	// Onboarding
+	protected.Get("/onboarding/status", handlers.GetOnboardingStatus)
+	protected.Patch("/onboarding/progress", handlers.UpdateOnboardingProgress)
+
 	// Media
 	protected.Post("/users/media", handlers.UploadMedia)
 	protected.Get("/users/:user_id/media", handlers.GetUserMedia)

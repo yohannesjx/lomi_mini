@@ -114,6 +114,19 @@ type User struct {
 	DailyFreeRevealUsed bool      `gorm:"default:false"`
 	LastRevealDate      time.Time `gorm:"type:date"`
 
+	// Onboarding Progress
+	// 0 = fresh (just logged in)
+	// 1 = age & gender done
+	// 2 = city done
+	// 3 = looking for + goal done
+	// 4 = religion done
+	// 5 = photos uploaded (at least 3)
+	// 6 = video recorded (optional)
+	// 7 = bio & interests done
+	// 8 = completed
+	OnboardingStep     int  `gorm:"default:0;check:onboarding_step >= 0 AND onboarding_step <= 8"`
+	OnboardingCompleted bool `gorm:"default:false;index"`
+
 	// Timestamps
 	CreatedAt time.Time      `gorm:"type:timestamptz;default:now()"`
 	UpdatedAt time.Time      `gorm:"type:timestamptz;default:now()"`
