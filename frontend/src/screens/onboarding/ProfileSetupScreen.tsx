@@ -115,7 +115,7 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
                             title="Next Step"
                             onPress={handleNext}
                             disabled={!name || !age || !gender || isSaving}
-                            loading={isSaving}
+                            isLoading={isSaving}
                             size="large"
                         />
                     </View>

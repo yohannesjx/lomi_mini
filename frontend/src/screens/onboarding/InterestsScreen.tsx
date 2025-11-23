@@ -116,7 +116,7 @@ export const InterestsScreen = ({ navigation }: any) => {
                         title="Finish Profile"
                         onPress={handleFinish}
                         disabled={selectedInterests.length < 3 || isSaving}
-                        loading={isSaving}
+                        isLoading={isSaving}
                         size="large"
                     />
                 </View>

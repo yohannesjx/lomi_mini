@@ -84,9 +84,57 @@ export const GenderPreferenceScreen = ({ navigation }: any) => {
                 </View>
 
                 <View style={styles.content}>
-                    <View style={styles.genderContainer}>
-                        <GenderOption type="female" label="Female" icon="👩🏾" />
-                        <GenderOption type="male" label="Male" icon="👨🏾" />
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>I'm looking for</Text>
+                        <View style={styles.genderContainer}>
+                            <GenderOption type="female" label="Female" icon="👩🏾" />
+                            <GenderOption type="male" label="Male" icon="👨🏾" />
+                        </View>
+                    </View>
+
+                    <View style={styles.section}>
+                        <Text style={styles.sectionTitle}>Relationship goal</Text>
+                        <View style={styles.goalContainer}>
+                            <TouchableOpacity
+                                style={[
+                                    styles.goalOption,
+                                    relationshipGoal === 'friends' && styles.goalOptionSelected
+                                ]}
+                                onPress={() => setRelationshipGoal('friends')}
+                            >
+                                <Text style={styles.goalIcon}>👥</Text>
+                                <Text style={[
+                                    styles.goalLabel,
+                                    relationshipGoal === 'friends' && styles.goalLabelSelected
+                                ]}>Friends</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.goalOption,
+                                    relationshipGoal === 'dating' && styles.goalOptionSelected
+                                ]}
+                                onPress={() => setRelationshipGoal('dating')}
+                            >
+                                <Text style={styles.goalIcon}>💕</Text>
+                                <Text style={[
+                                    styles.goalLabel,
+                                    relationshipGoal === 'dating' && styles.goalLabelSelected
+                                ]}>Dating</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[
+                                    styles.goalOption,
+                                    relationshipGoal === 'serious' && styles.goalOptionSelected
+                                ]}
+                                onPress={() => setRelationshipGoal('serious')}
+                            >
+                                <Text style={styles.goalIcon}>💍</Text>
+                                <Text style={[
+                                    styles.goalLabel,
+                                    relationshipGoal === 'serious' && styles.goalLabelSelected
+                                ]}>Serious</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
 
@@ -94,7 +142,7 @@ export const GenderPreferenceScreen = ({ navigation }: any) => {
                     <Button
                         title={isSaving ? "Saving..." : "Next Step"}
                         onPress={handleNext}
-                        disabled={!lookingFor || isSaving}
+                        disabled={!lookingFor || !relationshipGoal || isSaving}
                         isLoading={isSaving}
                         size="large"
                     />
@@ -175,6 +223,44 @@ const styles = StyleSheet.create({
     genderLabelSelected: {
         color: COLORS.primary,
         fontWeight: 'bold',
+    },
+    section: {
+        marginBottom: SPACING.xl,
+    },
+    sectionTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: COLORS.textPrimary,
+        marginBottom: SPACING.m,
+    },
+    goalContainer: {
+        flexDirection: 'row',
+        gap: SPACING.m,
+    },
+    goalOption: {
+        flex: 1,
+        backgroundColor: COLORS.surface,
+        borderRadius: SIZES.radiusM,
+        padding: SPACING.m,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: COLORS.surfaceHighlight,
+    },
+    goalOptionSelected: {
+        borderColor: COLORS.primary,
+        backgroundColor: 'rgba(167, 255, 131, 0.1)',
+    },
+    goalIcon: {
+        fontSize: 24,
+        marginBottom: SPACING.xs,
+    },
+    goalLabel: {
+        fontSize: 14,
+        color: COLORS.textSecondary,
+        fontWeight: '600',
+    },
+    goalLabelSelected: {
+        color: COLORS.primary,
     },
     footer: {
         marginTop: SPACING.xl,
