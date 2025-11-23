@@ -124,7 +124,7 @@ export const SwipeScreen = () => {
     const [activeTab, setActiveTab] = useState<'forYou' | 'doubleDate'>('forYou');
     const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | 'up' | null>(null);
     const [swipeProgress, setSwipeProgress] = useState(0);
-    
+
     // Shared values for button animations (Reanimated 3 worklets for 60fps)
     const cardTranslationX = useSharedValue(0);
     const cardTranslationY = useSharedValue(0);
@@ -137,7 +137,7 @@ export const SwipeScreen = () => {
             const nextCards = cards.slice(currentIndex, currentIndex + 5);
             nextCards.forEach((card) => {
                 card.photos.forEach((photo) => {
-                    Image.prefetch(photo.url).catch(() => {});
+                    Image.prefetch(photo.url).catch(() => { });
                 });
             });
         }
@@ -445,7 +445,7 @@ export const SwipeScreen = () => {
 
         // Mark swipe as complete for button animation
         isSwipeComplete.value = true;
-        
+
         // After 300ms, reset and move to next card
         setTimeout(() => {
             isSwipeComplete.value = false;
@@ -549,7 +549,7 @@ export const SwipeScreen = () => {
     // Handle card translation changes for button animations
     const handleTranslationXChange = useCallback((translationX: number) => {
         cardTranslationX.value = translationX;
-        
+
         // Trigger haptic feedback the moment drag starts
         if (!hapticTriggered.value) {
             if (translationX <= -1 || translationX >= 1) {
@@ -557,7 +557,7 @@ export const SwipeScreen = () => {
                 triggerHaptic.impact();
             }
         }
-        
+
         // Reset haptic trigger when back to center
         if (translationX === 0) {
             hapticTriggered.value = false;
@@ -566,7 +566,7 @@ export const SwipeScreen = () => {
 
     const handleTranslationYChange = useCallback((translationY: number) => {
         cardTranslationY.value = translationY;
-        
+
         // Trigger haptic feedback for swipe up
         if (!hapticTriggered.value) {
             if (translationY <= -1) {
@@ -574,7 +574,7 @@ export const SwipeScreen = () => {
                 triggerHaptic.impact();
             }
         }
-        
+
         // Reset haptic trigger when back to center
         if (translationY === 0) {
             hapticTriggered.value = false;
@@ -603,12 +603,12 @@ export const SwipeScreen = () => {
         const animatedStyle = useAnimatedStyle(() => {
             const cardXValue = cardTranslationX.value;
             const cardYValue = cardTranslationY.value;
-            
+
             // Determine swipe direction
             const isLeftSwipe = cardXValue <= -1;
             const isRightSwipe = cardXValue >= 1;
             const isUpSwipe = cardYValue <= -1;
-            
+
             // Calculate progress (0 to 1)
             let progress = 0;
             if (type === 'nope' && isLeftSwipe) {
@@ -618,7 +618,7 @@ export const SwipeScreen = () => {
             } else if (type === 'superlike' && isUpSwipe) {
                 progress = Math.min(Math.abs(cardYValue) / SWIPE_THRESHOLD_Y, 1);
             }
-            
+
             // Hide other buttons when swiping
             if (type === 'nope' && (isRightSwipe || isUpSwipe)) {
                 // Hide X when swiping right or up
@@ -646,7 +646,7 @@ export const SwipeScreen = () => {
                 buttonOpacity.value = withTiming(1, { duration: 200 });
                 buttonScale.value = withSpring(1, { damping: 15, stiffness: 200 });
             }
-            
+
             return {
                 transform: [{ scale: buttonScale.value }],
                 opacity: buttonOpacity.value,
@@ -694,7 +694,7 @@ export const SwipeScreen = () => {
     const filledLines = Math.min(Math.floor((currentIndex / Math.max(cards.length, 1)) * progressLines), progressLines);
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
             {/* Top Navigation */}
             <View style={styles.topNav}>
                 {/* Filter/Sort Icons */}
@@ -959,8 +959,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingBottom: SPACING.m,
-        paddingTop: SPACING.m,
+        paddingBottom: 0,
+        paddingTop: SPACING.s,
         paddingHorizontal: SPACING.l,
     },
     actionButton: {
