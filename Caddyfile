@@ -27,11 +27,11 @@ lomi.social {
     # Compression
     encode gzip zstd
     
-    # Logging
-    log {
-        output file /var/log/caddy/frontend.log
-        format json
-    }
+    # Logging (commented out - fix permissions first)
+    # log {
+    #     output file /var/log/caddy/frontend.log
+    #     format json
+    # }
     
     # File server
     file_server
@@ -39,20 +39,28 @@ lomi.social {
 
 # Backend API
 api.lomi.social {
-    # Reverse proxy to backend Docker container
-    reverse_proxy localhost:8080 {
-        header_up Host {host}
-        header_up X-Real-IP {remote}
-        header_up X-Forwarded-For {remote}
-        header_up X-Forwarded-Proto {scheme}
-        
-        # Health check
-        health_uri /api/v1/health
-        health_interval 30s
-        health_timeout 5s
+    # Handle WebSocket first
+    handle /ws {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+        }
     }
     
-    # CORS headers (backend should also handle this)
+    # Handle API requests
+    handle /api/* {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            
+            # Health check
+            health_uri /api/v1/health
+            health_interval 30s
+            health_timeout 5s
+        }
+    }
+    
+    # CORS headers
     header {
         Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
@@ -74,24 +82,8 @@ api.lomi.social {
         respond 204
     }
     
-    # Logging
-    log {
-        output file /var/log/caddy/api.log
-        format json
-    }
-    
     # Compression
     encode gzip zstd
-}
-
-# WebSocket support for real-time features
-api.lomi.social/ws {
-    reverse_proxy localhost:8080 {
-        header_up Host {host}
-        header_up X-Real-IP {remote}
-        header_up X-Forwarded-For {remote}
-        header_up X-Forwarded-Proto {scheme}
-    }
 }
 
 # Optional: Webhook endpoint (if you want it behind HTTPS)
