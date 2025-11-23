@@ -110,6 +110,11 @@ func handleModerationResult(payload string) {
 			continue
 		}
 
+		// Log detailed moderation result with scores
+		scoresJSON, _ := json.Marshal(photoResult.Scores)
+		log.Printf("📊 Moderation Result: media_id=%s, status=%s, reason=%s, scores=%s", 
+			mediaID, photoResult.Status, photoResult.Reason, string(scoresJSON))
+		
 		log.Printf("✅ Updated media record: media_id=%s, status=%s", mediaID, photoResult.Status)
 	}
 

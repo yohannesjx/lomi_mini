@@ -115,6 +115,10 @@ func SetupRoutes(app *fiber.App) {
 	admin.Put("/reports/:id/review", handlers.ReviewReport)
 	admin.Get("/payouts/pending", handlers.GetPendingPayouts)
 	admin.Put("/payouts/:id/process", handlers.ProcessPayout)
+	
+	// Photo Moderation Monitoring (Phase 3)
+	admin.Get("/queue-stats", handlers.GetQueueStats)
+	admin.Get("/moderation/dashboard", handlers.GetModerationDashboard)
 
 	// WebSocket (handles auth internally)
 	api.Get("/ws", websocket.New(handlers.HandleWebSocket))
