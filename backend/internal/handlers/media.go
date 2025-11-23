@@ -20,6 +20,8 @@ func UploadMedia(c *fiber.Ctx) error {
 	userIDStr := claims["user_id"].(string)
 	userID, _ := uuid.Parse(userIDStr)
 
+	fmt.Printf("📸 UploadMedia request - UserID: %s\n", userID)
+
 	var req struct {
 		MediaType      string `json:"media_type"` // "photo" or "video"
 		FileKey        string `json:"file_key"`   // S3 key (path) after upload to R2/S3
@@ -28,8 +30,12 @@ func UploadMedia(c *fiber.Ctx) error {
 		DisplayOrder   int    `json:"display_order"`
 	}
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
+		fmt.Printf("❌ Failed to parse request body: %v\n", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request", "details": err.Error()})
 	}
+
+	fmt.Printf("📸 Request data - MediaType: %s, FileKey: %s, DisplayOrder: %d\n", 
+		req.MediaType, req.FileKey, req.DisplayOrder)
 
 	// Validate media type
 	if req.MediaType != string(models.MediaTypePhoto) && req.MediaType != string(models.MediaTypeVideo) {
@@ -69,9 +75,14 @@ func UploadMedia(c *fiber.Ctx) error {
 	}
 
 	if err := database.DB.Create(&media).Error; err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create media record"})
+		fmt.Printf("❌ Failed to create media record: %v\n", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to create media record",
+			"details": err.Error(),
+		})
 	}
 
+	fmt.Printf("✅ Media record created successfully - ID: %s, FileKey: %s\n", media.ID, media.URL)
 	return c.Status(fiber.StatusCreated).JSON(media)
 }
 
@@ -203,19 +214,39 @@ func GetPresignedUploadURL(c *fiber.Ctx) error {
 		ext = ".mp4"
 	}
 
+	// Log S3 configuration
+	fmt.Printf("📤 Generating upload URL - UserID: %s, MediaType: %s, Bucket: %s\n", userID, mediaType, bucket)
+	fmt.Printf("📤 S3 Config - Endpoint: %s, Region: %s, UseSSL: %v\n", 
+		config.Cfg.S3Endpoint, config.Cfg.S3Region, config.Cfg.S3UseSSL)
+
+	// Check if S3 client is initialized
+	if database.S3Client == nil {
+		fmt.Printf("❌ S3Client is nil - S3 not connected!\n")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "S3 storage not configured",
+			"details": "S3Client is not initialized",
+		})
+	}
+
 	// Generate unique file key: users/{user_id}/{media_type}/{uuid}.{ext}
 	fileID := uuid.New()
 	key := fmt.Sprintf("users/%s/%s/%s%s", userID.String(), mediaType, fileID.String(), ext)
+
+	fmt.Printf("📤 Generated file key: %s\n", key)
 
 	// Generate pre-signed URL (expires in 1 hour)
 	ctx := context.Background()
 	expiresIn := 1 * time.Hour
 	uploadURL, err := database.GeneratePresignedUploadURL(ctx, bucket, key, expiresIn)
 	if err != nil {
+		fmt.Printf("❌ Failed to generate presigned URL: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to generate upload URL",
+			"details": err.Error(),
 		})
 	}
+
+	fmt.Printf("✅ Generated upload URL successfully (length: %d)\n", len(uploadURL))
 
 	return c.JSON(fiber.Map{
 		"upload_url": uploadURL,

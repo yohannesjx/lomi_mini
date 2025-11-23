@@ -47,7 +47,28 @@ func ConnectS3(cfg *config.Config) {
 		o.UsePathStyle = true
 	})
 
-	log.Println("✅ Connected to S3-compatible storage (R2/MinIO)")
+	// Log connection details (without sensitive data)
+	endpointURL := getEndpointURL(cfg.S3Endpoint, cfg.S3UseSSL)
+	log.Printf("✅ Connected to S3-compatible storage (R2/MinIO)")
+	log.Printf("   Endpoint: %s", endpointURL)
+	log.Printf("   Region: %s", cfg.S3Region)
+	log.Printf("   Buckets - Photos: %s, Videos: %s, Gifts: %s, Verifications: %s",
+		cfg.S3BucketPhotos, cfg.S3BucketVideos, cfg.S3BucketGifts, cfg.S3BucketVerify)
+	
+	// Test connection by trying to list buckets (non-blocking, just for verification)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		// Try to list buckets to verify connection
+		_, err := S3Client.ListBuckets(ctx, &s3.ListBucketsInput{})
+		if err != nil {
+			log.Printf("⚠️  S3 connection test failed: %v", err)
+			log.Printf("   This might be normal if buckets don't exist yet or permissions are restricted")
+		} else {
+			log.Printf("✅ S3 connection verified successfully")
+		}
+	}()
 }
 
 // getEndpointURL constructs the full endpoint URL
@@ -67,6 +88,12 @@ func getEndpointURL(endpoint string, useSSL bool) string {
 
 // GeneratePresignedUploadURL generates a pre-signed URL for uploading to R2/S3
 func GeneratePresignedUploadURL(ctx context.Context, bucket, key string, expiresIn time.Duration) (string, error) {
+	if S3Client == nil {
+		return "", fmt.Errorf("S3Client is not initialized")
+	}
+
+	log.Printf("🔗 Generating presigned URL - Bucket: %s, Key: %s, ExpiresIn: %v", bucket, key, expiresIn)
+	
 	presignClient := s3.NewPresignClient(S3Client)
 
 	request, err := presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
@@ -76,9 +103,11 @@ func GeneratePresignedUploadURL(ctx context.Context, bucket, key string, expires
 		opts.Expires = expiresIn
 	})
 	if err != nil {
+		log.Printf("❌ Failed to generate presigned URL: %v", err)
 		return "", fmt.Errorf("failed to generate presigned upload URL: %w", err)
 	}
 
+	log.Printf("✅ Presigned URL generated successfully (URL length: %d)", len(request.URL))
 	return request.URL, nil
 }
 
