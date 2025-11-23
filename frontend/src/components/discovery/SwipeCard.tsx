@@ -102,7 +102,7 @@ export const SwipeCard: React.FC<CardProps> = React.memo(({ profile, onSwipe, on
     const translateY = useSharedValue(0);
     const scale = useSharedValue(1);
     const opacity = useSharedValue(1);
-    
+
     // Expose translateX to parent for button animations
     useAnimatedReaction(
         () => translateX.value,
@@ -292,7 +292,7 @@ export const SwipeCard: React.FC<CardProps> = React.memo(({ profile, onSwipe, on
     // Handle photo tap navigation - cycle through photos
     const handlePhotoTap = useCallback(() => {
         if (!isTopCard || mediaItems.length <= 1) return;
-        
+
         // Cycle to next photo, wrap around to first if at the end
         setCurrentPhotoIndex((prev) => (prev + 1) % mediaItems.length);
     }, [mediaItems.length, isTopCard]);
@@ -441,8 +441,8 @@ SwipeCard.displayName = 'SwipeCard';
 
 const styles = StyleSheet.create({
     container: {
-        width: CARD_WIDTH,
-        height: CARD_HEIGHT,
+        width: '100%',
+        height: '100%',
         borderRadius: 16,
         backgroundColor: COLORS.surface,
         overflow: 'hidden',

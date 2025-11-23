@@ -695,70 +695,73 @@ export const SwipeScreen = () => {
 
     return (
         <SafeAreaView style={styles.container} edges={['top']}>
-            {/* Top Navigation */}
-            <View style={styles.topNav}>
-                {/* Filter/Sort Icons */}
-                <View style={styles.filterIcons}>
-                    <TouchableOpacity style={styles.filterButton}>
-                        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                            <Path
-                                d="M3 6h18M7 12h10M11 18h2"
-                                stroke={COLORS.textSecondary}
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                            />
-                        </Svg>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.filterButton}>
-                        <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-                            <Path
-                                d="M3 6h6M7 12h10M11 18h6"
-                                stroke={COLORS.textSecondary}
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                            />
-                        </Svg>
-                    </TouchableOpacity>
+            {/* Top Header Block */}
+            <View style={styles.headerBlock}>
+                {/* Top Navigation */}
+                <View style={styles.topNav}>
+                    {/* Filter/Sort Icons */}
+                    <View style={styles.filterIcons}>
+                        <TouchableOpacity style={styles.filterButton}>
+                            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                                <Path
+                                    d="M3 6h18M7 12h10M11 18h2"
+                                    stroke={COLORS.textSecondary}
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                />
+                            </Svg>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.filterButton}>
+                            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+                                <Path
+                                    d="M3 6h6M7 12h10M11 18h6"
+                                    stroke={COLORS.textSecondary}
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                />
+                            </Svg>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Tabs */}
+                    <View style={styles.tabsContainer}>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'forYou' && styles.tabActive]}
+                            onPress={() => setActiveTab('forYou')}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'forYou' && styles.tabTextActive]}>
+                                For You
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'doubleDate' && styles.tabActive]}
+                            onPress={() => setActiveTab('doubleDate')}
+                        >
+                            <Text style={[styles.tabText, activeTab === 'doubleDate' && styles.tabTextActive]}>
+                                Double Date
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
-                {/* Tabs */}
-                <View style={styles.tabsContainer}>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'forYou' && styles.tabActive]}
-                        onPress={() => setActiveTab('forYou')}
-                    >
-                        <Text style={[styles.tabText, activeTab === 'forYou' && styles.tabTextActive]}>
-                            For You
-                        </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.tab, activeTab === 'doubleDate' && styles.tabActive]}
-                        onPress={() => setActiveTab('doubleDate')}
-                    >
-                        <Text style={[styles.tabText, activeTab === 'doubleDate' && styles.tabTextActive]}>
-                            Double Date
-                        </Text>
-                    </TouchableOpacity>
-                </View>
+                {/* Progress Indicator */}
+                {cards.length > 0 && (
+                    <View style={styles.progressContainer}>
+                        {Array.from({ length: progressLines }).map((_, index) => (
+                            <View
+                                key={index}
+                                style={[
+                                    styles.progressLine,
+                                    index < filledLines && styles.progressLineFilled,
+                                ]}
+                            />
+                        ))}
+                    </View>
+                )}
             </View>
 
-            {/* Progress Indicator */}
-            {cards.length > 0 && (
-                <View style={styles.progressContainer}>
-                    {Array.from({ length: progressLines }).map((_, index) => (
-                        <View
-                            key={index}
-                            style={[
-                                styles.progressLine,
-                                index < filledLines && styles.progressLineFilled,
-                            ]}
-                        />
-                    ))}
-                </View>
-            )}
-
-            {/* Card Container */}
-            <View style={styles.cardContainer}>
+            {/* Main Card Area - Takes ALL remaining space */}
+            <View style={styles.mainContent}>
                 {isLoading ? (
                     <View style={styles.loadingContainer}>
                         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -818,7 +821,7 @@ export const SwipeScreen = () => {
                 )}
             </View>
 
-            {/* Action Buttons - 4 buttons */}
+            {/* Action Buttons - Absolute Positioned at Bottom */}
             {!isLoading && cards.length > 0 && (
                 <View style={styles.actionsContainer}>
                     {/* Nope */}
@@ -879,7 +882,10 @@ export const SwipeScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: COLORS.background,
+        backgroundColor: '#000',
+    },
+    headerBlock: {
+        paddingBottom: SPACING.s,
     },
     topNav: {
         flexDirection: 'row',
@@ -926,7 +932,7 @@ const styles = StyleSheet.create({
     progressContainer: {
         flexDirection: 'row',
         paddingHorizontal: SPACING.l,
-        paddingVertical: SPACING.s,
+        paddingVertical: 4,
         gap: 4,
     },
     progressLine: {
@@ -938,11 +944,10 @@ const styles = StyleSheet.create({
     progressLineFilled: {
         backgroundColor: 'rgba(255,255,255,0.4)',
     },
-    cardContainer: {
+    mainContent: {
         flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
         position: 'relative',
+        marginHorizontal: 4, // Tiny margin for card edge
     },
     loadingContainer: {
         flex: 1,
@@ -951,18 +956,22 @@ const styles = StyleSheet.create({
     },
     cardWrapper: {
         position: 'absolute',
-        width: '100%',
-        height: '100%',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         alignItems: 'center',
         justifyContent: 'center',
     },
     actionsContainer: {
+        position: 'absolute',
+        bottom: 90, // Height of tab bar + safe area
+        left: 20,
+        right: 20,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingBottom: 10,
-        paddingTop: 0,
-        paddingHorizontal: SPACING.l,
+        zIndex: 100, // Ensure buttons are above cards
     },
     actionButton: {
         backgroundColor: COLORS.textPrimary,
