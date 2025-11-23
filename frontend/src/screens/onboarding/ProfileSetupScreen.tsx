@@ -54,16 +54,38 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
 
             // Update onboarding step to 1 (age & gender done)
             console.log('📤 Updating onboarding step to 1...');
-            await updateStep(1);
-            console.log('✅ Onboarding step updated');
+            try {
+                await updateStep(1);
+                console.log('✅ Onboarding step updated');
+            } catch (stepError: any) {
+                console.warn('⚠️ Failed to update onboarding step, but continuing:', stepError);
+                // Don't block navigation if step update fails
+            }
 
             // Navigate to next step (city)
             console.log('🧭 Navigating to City screen...');
-            if (navigation && navigation.navigate) {
-                navigation.navigate('City');
-                console.log('✅ Navigation called');
+            console.log('Navigation object:', navigation);
+            
+            if (navigation && typeof navigation.navigate === 'function') {
+                try {
+                    navigation.navigate('City');
+                    console.log('✅ Navigation called successfully');
+                } catch (navError: any) {
+                    console.error('❌ Navigation error:', navError);
+                    // Try alternative navigation method
+                    if (navigation.push) {
+                        navigation.push('City');
+                    } else if (navigation.replace) {
+                        navigation.replace('City');
+                    } else {
+                        Alert.alert('Navigation Error', `Could not navigate: ${navError.message}. Please try refreshing the app.`);
+                    }
+                }
             } else {
-                console.error('❌ Navigation not available:', navigation);
+                console.error('❌ Navigation not available:', { 
+                    hasNavigation: !!navigation, 
+                    hasNavigate: navigation && typeof navigation.navigate === 'function' 
+                });
                 Alert.alert('Navigation Error', 'Navigation is not available. Please refresh the app.');
             }
         } catch (error: any) {
@@ -72,9 +94,13 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
                 message: error?.message,
                 response: error?.response?.data,
                 status: error?.response?.status,
+                stack: error?.stack,
             });
             
-            const errorMessage = error?.response?.data?.error || error?.message || 'Failed to save profile. Please try again.';
+            const errorMessage = error?.response?.data?.error || 
+                                error?.response?.data?.details || 
+                                error?.message || 
+                                'Failed to save profile. Please check your connection and try again.';
             Alert.alert('Error', errorMessage);
         } finally {
             setIsSaving(false);
