@@ -230,11 +230,11 @@ func (h *AuthHandler) TelegramWidgetLogin(c *fiber.Ctx) error {
 		c.Method(), c.Path(), c.IP())
 	
 	// Get parameters from query string (redirect method) or request body (callback method)
-	var params map[string]string
+	params := make(map[string]string)
 	
 	if c.Method() == "GET" {
 		// Redirect method - parameters in query string
-		params = make(map[string]string)
+		// c.Queries() returns map[string][]string
 		for key, values := range c.Queries() {
 			if len(values) > 0 {
 				params[key] = values[0]
@@ -257,7 +257,7 @@ func (h *AuthHandler) TelegramWidgetLogin(c *fiber.Ctx) error {
 	firstName := params["first_name"]
 	lastName := params["last_name"]
 	username := params["username"]
-	photoURL := params["photo_url"]
+	// photoURL := params["photo_url"] // Available but not used for now
 	authDateStr := params["auth_date"]
 	hash := params["hash"]
 	
