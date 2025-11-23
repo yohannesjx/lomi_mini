@@ -29,12 +29,9 @@ Build a zero-lag, production-grade photo moderation system that handles 500+ sim
 4. **Python Worker** (`moderator-worker/app.py`):
    - ✅ Blur detection (OpenCV Laplacian variance < 120)
    - ✅ Face detection (CompreFace API)
-   - ✅ NSFW detection (Falconsai/nsfw_image_detection model)
+   - ✅ NSFW detection (Falconsai/nsfw_image_detection model) - **WORKING** ✅
    - ✅ Batch processing (1-9 photos per job)
-   - ⚠️ NSFW model loading issue - needs fix
-
-### 🔧 Current Issue
-**NSFW Model**: `Falconsai/nsfw_image_detection` model exists but workers can't load it. Error: "not a valid model identifier". Need to verify model name or use alternative.
+   - ✅ All 4 workers successfully loading NSFW model
 
 ### 📊 Architecture Flow
 
@@ -67,15 +64,20 @@ Go subscriber updates DB + sends grouped push notification
 
 ## 📝 Next Steps
 
-### Immediate (To Fix NSFW Model):
-1. **Verify Falconsai model name** - Check if it's `Falconsai/nsfw_image_detection` or different
-2. **Alternative**: Use `FalAI/nsfw_image_detection` or `unbiased-ai/nsfw_image_detection`
-3. **Test model loading** in worker container
+### Phase 2 (End-to-End Test) - **READY TO START**:
+1. ✅ **Test script created**: `./test-phase2-moderation.sh`
+2. Run end-to-end test: Upload photos → Queue → Workers → DB
+3. Monitor Redis queue → worker logs → DB updates
+4. Verify push notifications sent
 
-### Phase 2 (End-to-End Test):
-1. Upload 10 test photos via Mini App
-2. Monitor Redis queue → worker logs → DB updates
-3. Verify push notifications sent
+**To run Phase 2 test:**
+```bash
+# Test with 5 photos (default)
+./test-phase2-moderation.sh
+
+# Test with 9 photos (max batch size)
+./test-phase2-moderation.sh 9
+```
 
 ### Phase 3 (Monitoring):
 1. Add `GET /admin/queue-stats` endpoint
@@ -99,6 +101,7 @@ Go subscriber updates DB + sends grouped push notification
 - `docker-compose.prod.yml` - CompreFace + 4 workers
 
 **Monitoring Scripts:**
+- `test-phase2-moderation.sh` - **Phase 2 end-to-end test** (NEW)
 - `monitor-moderation.sh` - Real-time dashboard
 - `watch-worker-logs.sh` - Worker logs
 - `check-moderation-results.sh` - DB results
@@ -106,7 +109,7 @@ Go subscriber updates DB + sends grouped push notification
 
 ## 🚨 Known Issues
 
-1. **NSFW Model**: `Falconsai/nsfw_image_detection` not loading - need to verify correct model name
+1. ~~**NSFW Model**: `Falconsai/nsfw_image_detection` not loading~~ ✅ **RESOLVED** - All workers loading successfully
 2. **CompreFace**: May need health check - verify it's responding
 3. **R2 URLs**: Using presigned download URLs (1h expiry) - verified working
 
@@ -143,18 +146,18 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --sca
 ✅ Presigned R2 download URLs  
 ✅ Blur detection (OpenCV)  
 ✅ Face detection (CompreFace)  
+✅ **NSFW detection (Falconsai/nsfw_image_detection) - All 4 workers loaded successfully** ✅  
 ✅ Batch processing (1 job per upload session)  
 ✅ Smart grouped push notifications  
 ✅ Rate limiting (30 photos/24h)  
 
 ## ⚠️ What Needs Fixing
 
-❌ NSFW model loading - `Falconsai/nsfw_image_detection` not found  
 ❌ End-to-end test not completed  
 ❌ Monitoring dashboard not implemented  
 
 ---
 
 **Last Updated**: 2025-11-24  
-**Status**: Phase 1 complete, NSFW model needs fix, ready for testing
+**Status**: Phase 1 complete ✅ - All components working! NSFW model loaded successfully on all 4 workers. Ready for Phase 2 (end-to-end testing).
 
