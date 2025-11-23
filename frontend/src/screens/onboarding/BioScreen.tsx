@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
+import { BackButton } from '../../components/ui/BackButton';
 import { Input } from '../../components/ui/Input';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
@@ -24,14 +25,16 @@ export const BioScreen = ({ navigation }: any) => {
     const handleNext = async () => {
         setIsSaving(true);
         try {
-            // Save bio to profile
-            await UserService.updateProfile({ bio: bio.trim() });
+            // Save bio to profile (optional, can be empty)
+            if (bio.trim()) {
+                await UserService.updateProfile({ bio: bio.trim() });
+            }
 
             // Update onboarding step to 7 (bio done)
             await updateStep(7);
 
-            // Navigate to interests (part of step 7)
-            navigation.navigate('Interests');
+            // Navigate to completion screen
+            navigation.navigate('OnboardingComplete');
         } catch (error: any) {
             console.error('Save bio error:', error);
             Alert.alert('Error', 'Failed to save bio. Please try again.');
@@ -41,15 +44,21 @@ export const BioScreen = ({ navigation }: any) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.keyboardView}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent}>
+                <BackButton />
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <View style={styles.header}>
                         <Text style={styles.title}>Tell us about yourself</Text>
-                        <Text style={styles.subtitle}>Write a short bio that shows your personality</Text>
+                        <Text style={styles.subtitle}>Write a short bio (optional)</Text>
                     </View>
 
                     <View style={styles.form}>
@@ -65,16 +74,16 @@ export const BioScreen = ({ navigation }: any) => {
                         />
                         <Text style={styles.charCount}>{bio.length}/500</Text>
                     </View>
-
-                    <View style={styles.footer}>
-                        <Button
-                            title="Continue"
-                            onPress={handleNext}
-                            loading={isSaving}
-                            size="large"
-                        />
-                    </View>
                 </ScrollView>
+
+                <View style={styles.footer}>
+                    <Button
+                        title={bio.trim() ? "Continue" : "Skip"}
+                        onPress={handleNext}
+                        isLoading={isSaving}
+                        size="large"
+                    />
+                </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -85,9 +94,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
+    keyboardView: {
+        flex: 1,
+    },
     scrollContent: {
         flexGrow: 1,
         padding: SPACING.l,
+        paddingBottom: SPACING.xl,
     },
     header: {
         marginBottom: SPACING.xl,
@@ -116,7 +129,11 @@ const styles = StyleSheet.create({
         marginTop: SPACING.xs,
     },
     footer: {
-        marginTop: SPACING.xl,
+        padding: SPACING.l,
+        paddingBottom: Platform.OS === 'ios' ? SPACING.m : SPACING.l,
+        backgroundColor: COLORS.background,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.surfaceHighlight,
     },
 });
 

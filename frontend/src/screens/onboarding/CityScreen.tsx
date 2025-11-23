@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
+import { BackButton } from '../../components/ui/BackButton';
 import { Input } from '../../components/ui/Input';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
@@ -43,12 +44,18 @@ export const CityScreen = ({ navigation }: any) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={styles.keyboardView}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
-                <ScrollView contentContainerStyle={styles.scrollContent}>
+                <BackButton />
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <View style={styles.header}>
                         <Text style={styles.title}>Where are you located?</Text>
                         <Text style={styles.subtitle}>This helps us find matches near you</Text>
@@ -63,17 +70,17 @@ export const CityScreen = ({ navigation }: any) => {
                             autoCapitalize="words"
                         />
                     </View>
-
-                    <View style={styles.footer}>
-                        <Button
-                            title="Continue"
-                            onPress={handleNext}
-                            disabled={!city.trim() || isSaving}
-                            loading={isSaving}
-                            size="large"
-                        />
-                    </View>
                 </ScrollView>
+
+                <View style={styles.footer}>
+                    <Button
+                        title="Continue"
+                        onPress={handleNext}
+                        disabled={!city.trim() || isSaving}
+                        isLoading={isSaving}
+                        size="large"
+                    />
+                </View>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -84,9 +91,13 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
+    keyboardView: {
+        flex: 1,
+    },
     scrollContent: {
         flexGrow: 1,
         padding: SPACING.l,
+        paddingBottom: SPACING.xl,
     },
     header: {
         marginBottom: SPACING.xl,
@@ -105,7 +116,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     footer: {
-        marginTop: SPACING.xl,
+        padding: SPACING.l,
+        paddingBottom: Platform.OS === 'ios' ? SPACING.m : SPACING.l,
+        backgroundColor: COLORS.background,
+        borderTopWidth: 1,
+        borderTopColor: COLORS.surfaceHighlight,
     },
 });
 
