@@ -186,19 +186,32 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 				firstName = "User" // Fallback if first name is empty
 			}
 			
+			// Create user with minimal required fields for Telegram authentication
+			// All other fields will be filled during onboarding process
 			user = models.User{
+				// Telegram Integration (required for auth)
 				TelegramID:        tgUser.ID,
 				TelegramUsername:  tgUser.Username,
 				TelegramFirstName: tgUser.FirstName,
 				TelegramLastName:  tgUser.LastName,
-				Name:              firstName,
-				Age:               18,                      // Default age (will be updated during onboarding)
-				Gender:            models.GenderOther,      // Default gender (will be updated during onboarding)
-				City:              "Not Set",              // Default city (will be updated during onboarding)
-				Religion:          models.ReligionNone,    // Default religion (will be updated during onboarding)
-				RelationshipGoal:  models.GoalDating,      // Default relationship goal
-				IsActive:          true,
-				// Other fields will be filled during onboarding
+				
+				// Required fields (minimal defaults - will be updated in onboarding)
+				Name:             firstName,                    // From Telegram, will be updated
+				Age:              18,                           // Minimum age, will be updated
+				Gender:           models.GenderOther,          // Default, will be updated
+				City:             "Not Set",                   // Placeholder, will be updated
+				RelationshipGoal:  models.GoalDating,           // Default, will be updated
+				
+				// Optional enum fields (set defaults to avoid PostgreSQL enum errors)
+				Religion:          models.ReligionNone,        // Default, will be updated
+				VerificationStatus: models.VerificationPending, // New users start as pending
+				
+				// Status
+				IsActive: true,
+				IsVerified: false,
+				
+				// All other fields (Bio, Languages, Interests, Location, etc.) 
+				// will be filled during the onboarding process
 			}
 			if err := database.DB.Create(&user).Error; err != nil {
 				log.Printf("❌ Failed to create user: %v", err)
@@ -464,18 +477,31 @@ func (h *AuthHandler) TelegramWidgetLogin(c *fiber.Ctx) error {
 				firstName = "User" // Fallback if first name is empty
 			}
 			
+			// Create user with minimal required fields for Telegram authentication
+			// All other fields will be filled during onboarding process
 			user = models.User{
+				// Telegram Integration (required for auth)
 				TelegramID:        tgUser.ID,
 				TelegramUsername:  tgUser.Username,
 				TelegramFirstName: tgUser.FirstName,
 				TelegramLastName:  tgUser.LastName,
-				Name:              firstName,
-				Age:               18,                      // Default age (will be updated during onboarding)
-				Gender:            models.GenderOther,      // Default gender (will be updated during onboarding)
-				City:              "Not Set",              // Default city (will be updated during onboarding)
-				Religion:          models.ReligionNone,    // Default religion (will be updated during onboarding)
-				RelationshipGoal:  models.GoalDating,      // Default relationship goal
-				IsActive:          true,
+				
+				// Required fields (minimal defaults - will be updated in onboarding)
+				Name:             firstName,                    // From Telegram, will be updated
+				Age:              18,                           // Minimum age, will be updated
+				Gender:           models.GenderOther,          // Default, will be updated
+				City:             "Not Set",                   // Placeholder, will be updated
+				RelationshipGoal:  models.GoalDating,           // Default, will be updated
+				
+				// Optional enum fields (set defaults to avoid PostgreSQL enum errors)
+				Religion:          models.ReligionNone,        // Default, will be updated
+				VerificationStatus: models.VerificationPending, // New users start as pending
+				
+				// Status
+				IsActive: true,
+				IsVerified: false,
+				
+				// All other fields will be filled during the onboarding process
 			}
 			if err := database.DB.Create(&user).Error; err != nil {
 				log.Printf("❌ Failed to create user (widget): %v", err)
