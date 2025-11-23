@@ -1,10 +1,6 @@
-# Caddyfile for Lomi Social
-# Ultra-minimal working configuration
-
 :80 {
     reverse_proxy /api/* localhost:8080
     reverse_proxy /ws localhost:8080
-    
     root * /var/www/lomi-frontend
     try_files {path} /index.html
     file_server
@@ -13,7 +9,6 @@
 lomi.social {
     reverse_proxy /api/* localhost:8080
     reverse_proxy /ws localhost:8080
-    
     root * /var/www/lomi-frontend
     try_files {path} /index.html
     file_server
