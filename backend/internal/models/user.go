@@ -128,7 +128,7 @@ type User struct {
 	OnboardingCompleted bool `gorm:"default:false;index"`
 
 	// Tutorial & First-Time Experience
-	HasSeenSwipeTutorial bool `gorm:"default:false;index"` // Column added via migration 003
+	HasSeenSwipeTutorial bool `gorm:"-"` // Ignore this field in GORM until migration is run
 
 	// Timestamps
 	CreatedAt time.Time      `gorm:"type:timestamptz;default:now()"`
