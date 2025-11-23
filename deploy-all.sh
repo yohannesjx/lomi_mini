@@ -25,6 +25,19 @@ cd "$PROJECT_DIR"
 echo "📁 Project directory: $PROJECT_DIR"
 echo ""
 
+# Check for .env.production
+if [ ! -f ".env.production" ]; then
+    echo "❌ Error: .env.production not found!"
+    echo "Create it with your environment variables"
+    exit 1
+fi
+
+# Load environment variables
+echo "📋 Loading environment variables..."
+export $(cat .env.production | grep -v '^#' | grep -v '^$' | xargs)
+echo "✅ Environment variables loaded"
+echo ""
+
 # Step 1: Pull latest code
 echo "📥 Step 1: Pulling latest code from GitHub..."
 git pull origin main
@@ -38,8 +51,15 @@ docker-compose -f docker-compose.prod.yml down
 
 # Free port 8080 if needed
 echo "Freeing port 8080..."
-sudo kill -9 $(sudo lsof -ti:8080) 2>/dev/null || true
+if command -v lsof > /dev/null 2>&1; then
+    sudo kill -9 $(sudo lsof -ti:8080) 2>/dev/null || true
+elif command -v fuser > /dev/null 2>&1; then
+    sudo fuser -k 8080/tcp 2>/dev/null || true
+fi
 sleep 2
+
+echo "Building backend (if needed)..."
+docker-compose -f docker-compose.prod.yml build backend
 
 echo "Starting backend services..."
 docker-compose -f docker-compose.prod.yml up -d
