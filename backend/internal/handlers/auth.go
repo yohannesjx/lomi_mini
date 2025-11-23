@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"strings"
+	"time"
 	"lomi-backend/config"
 	"lomi-backend/internal/database"
 	"lomi-backend/internal/models"
@@ -23,7 +24,7 @@ func NewAuthHandler(cfg *config.Config) *AuthHandler {
 
 func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 	// Get initData from Authorization header (Telegram Mini Apps SDK approach)
-	// Format: "tma <initData>"
+	// Format: "tma <initData>" as per official documentation
 	authHeader := c.Get("Authorization")
 	if authHeader == "" {
 		// Fallback: try to get from request body (for backward compatibility)
@@ -33,27 +34,48 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 		if err := c.BodyParser(&req); err == nil && req.InitData != "" {
 			authHeader = "tma " + req.InitData
 		} else {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Missing Authorization header or init_data"})
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "Missing Authorization header",
+				"message": "Expected format: Authorization: tma <initData>",
+			})
 		}
 	}
 
 	// Extract initData from "tma <initData>" format
-	var initData string
-	if strings.HasPrefix(authHeader, "tma ") {
-		initData = strings.TrimPrefix(authHeader, "tma ")
-	} else {
-		// If no "tma " prefix, assume the whole header is initData (backward compatibility)
-		initData = authHeader
+	// Split by space: [0] = auth type, [1] = auth data
+	authParts := strings.SplitN(authHeader, " ", 2)
+	if len(authParts) != 2 {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Invalid Authorization header format",
+			"message": "Expected format: Authorization: tma <initData>",
+		})
+	}
+
+	authType := authParts[0]
+	initData := authParts[1]
+
+	// Verify auth type is "tma" (Telegram Mini App)
+	if authType != "tma" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Unsupported authorization type",
+			"message": fmt.Sprintf("Expected 'tma', got '%s'", authType),
+		})
 	}
 
 	if initData == "" {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid Authorization header format"})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Missing initData in Authorization header",
+		})
 	}
 
-	// 1. Validate Telegram Data
-	tgUser, err := utils.ValidateTelegramInitData(initData, h.cfg.TelegramBotToken)
+	// 1. Validate Telegram Data (following official Telegram Mini Apps SDK pattern)
+	// Consider initData valid for 1 hour from creation moment
+	tgUser, err := utils.ValidateTelegramInitData(initData, h.cfg.TelegramBotToken, time.Hour)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid Telegram data", "details": err.Error()})
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":   "Invalid Telegram data",
+			"details": err.Error(),
+		})
 	}
 
 	// 2. Find or Create User
