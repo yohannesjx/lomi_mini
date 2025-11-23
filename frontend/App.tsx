@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, View, Text, Platform } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -34,6 +34,7 @@ import { ExploreDetailScreen } from './src/screens/explore/ExploreDetailScreen';
 const Stack = createStackNavigator();
 
 export default function App() {
+    const navigationRef = useRef<NavigationContainerRef<any>>(null);
 
     useEffect(() => {
         // Inject Telegram WebApp script for Web platform
@@ -75,8 +76,8 @@ export default function App() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
-                <AuthGuard>
-                <NavigationContainer theme={{
+                <AuthGuard navigationRef={navigationRef}>
+                <NavigationContainer ref={navigationRef} theme={{
                 dark: true,
                 colors: {
                     primary: COLORS.primary,

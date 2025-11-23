@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { NavigationContainerRef } from '@react-navigation/native';
 import { useAuthStore } from '../store/authStore';
 import { getTelegramInitData, isTelegramWebApp, getTelegramWebApp } from '../utils/telegram';
 import { COLORS } from '../theme/colors';
@@ -15,8 +15,10 @@ import { Button } from './ui/Button';
  * 3. Routes to onboarding (new users) or main app (existing users)
  * 4. Shows "Open in Telegram" message if not in Telegram
  */
-export const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const navigation = useNavigation();
+export const AuthGuard: React.FC<{ 
+    children: React.ReactNode;
+    navigationRef?: React.RefObject<NavigationContainerRef<any>>;
+}> = ({ children, navigationRef }) => {
     const { 
         isAuthenticated, 
         isLoading, 
@@ -52,7 +54,8 @@ export const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children })
             await loadTokens();
 
             // Step 3: If already authenticated, check if onboarding is needed
-            if (isAuthenticated && user) {
+            const currentAuthState = useAuthStore.getState();
+            if (currentAuthState.isAuthenticated && currentAuthState.user) {
                 console.log('✅ User already authenticated');
                 handlePostAuthRouting();
                 setIsCheckingAuth(false);
@@ -113,30 +116,38 @@ export const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children })
             return;
         }
 
-        // Check if user has completed onboarding
-        // has_profile indicates if user has filled in profile details (city, bio, etc.)
-        const hasCompletedOnboarding = currentUser.has_profile === true;
+        // Wait a bit for navigation to be ready
+        setTimeout(() => {
+            if (!navigationRef?.current) {
+                console.warn('⚠️ Navigation not ready yet');
+                return;
+            }
 
-        console.log('📊 User onboarding status:', {
-            has_profile: currentUser.has_profile,
-            hasCompletedOnboarding,
-        });
+            // Check if user has completed onboarding
+            // has_profile indicates if user has filled in profile details (city, bio, etc.)
+            const hasCompletedOnboarding = currentUser.has_profile === true;
 
-        if (hasCompletedOnboarding) {
-            // User has completed onboarding, go to main app
-            console.log('✅ User has completed onboarding, navigating to Main');
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'Main' as never }],
+            console.log('📊 User onboarding status:', {
+                has_profile: currentUser.has_profile,
+                hasCompletedOnboarding,
             });
-        } else {
-            // New user, start onboarding
-            console.log('🆕 New user detected, starting onboarding');
-            navigation.reset({
-                index: 0,
-                routes: [{ name: 'ProfileSetup' as never }],
-            });
-        }
+
+            if (hasCompletedOnboarding) {
+                // User has completed onboarding, go to main app
+                console.log('✅ User has completed onboarding, navigating to Main');
+                navigationRef.current.reset({
+                    index: 0,
+                    routes: [{ name: 'Main' }],
+                });
+            } else {
+                // New user, start onboarding
+                console.log('🆕 New user detected, starting onboarding');
+                navigationRef.current.reset({
+                    index: 0,
+                    routes: [{ name: 'ProfileSetup' }],
+                });
+            }
+        }, 100);
     };
 
     const handleRetry = () => {
@@ -209,6 +220,13 @@ export const AuthGuard: React.FC<{ children: React.ReactNode }> = ({ children })
     }
 
     // User is authenticated, render children
+    // Also render children if we're still checking but want to show the app
+    if (isAuthenticated || (isInTelegram === null && !authError)) {
+        return <>{children}</>;
+    }
+
+    // Fallback: render children anyway to prevent blank screen
+    // The WelcomeScreen will handle showing the login UI
     return <>{children}</>;
 };
 
