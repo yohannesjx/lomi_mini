@@ -2,12 +2,17 @@
 # Place this in /etc/caddy/Caddyfile on your server
 # Server IP: 152.53.87.200
 #
-# DNS Configuration Required:
+# DNS Configuration (Optional - works with IP too):
 # A     lomi.social        → 152.53.87.200
 # A     api.lomi.social    → 152.53.87.200
+#
+# This config works with:
+# - Domain names (when DNS is configured) → Automatic SSL
+# - IP address (152.53.87.200) → Works immediately, no SSL
 
 # Landing Page / Frontend
-lomi.social {
+# Works with both domain and IP
+lomi.social, 152.53.87.200, local.lomi {
     # Serve static files (if hosting frontend on server)
     # Update this path to where your frontend build is located
     root * /var/www/lomi-frontend
@@ -38,6 +43,8 @@ lomi.social {
 }
 
 # Backend API
+# Works with both domain and IP
+# Access via: api.lomi.social OR 152.53.87.200 (use /api/* path)
 api.lomi.social {
     # Handle WebSocket first
     handle /ws {
