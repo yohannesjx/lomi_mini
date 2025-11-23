@@ -1,0 +1,55 @@
+# Simple Caddyfile - Works even if DNS isn't ready
+# Use this if DNS isn't configured yet
+# Server IP: 152.53.87.200
+
+# Serve on IP address (temporary until DNS is ready)
+:80 {
+    # Handle API requests
+    handle /api/* {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Handle WebSocket
+    handle /ws {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Handle frontend (if hosting on server)
+    handle {
+        root * /var/www/lomi-frontend
+        try_files {path} /index.html
+        file_server
+    }
+    
+    # CORS headers
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    }
+    
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+    
+    encode gzip zstd
+    
+    log {
+        output file /var/log/caddy/app.log
+        format json
+    }
+}
+
