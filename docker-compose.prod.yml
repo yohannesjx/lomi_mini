@@ -1,9 +1,5 @@
 version: '3.8'
 
-# Load environment variables from .env.production
-env_file:
-  - .env.production
-
 services:
   # PostgreSQL Database
   postgres:
