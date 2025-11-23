@@ -33,9 +33,33 @@ if [ ! -f ".env.production" ]; then
 fi
 
 # Load environment variables
-echo "📋 Loading environment variables..."
-export $(cat .env.production | grep -v '^#' | grep -v '^$' | xargs)
-echo "✅ Environment variables loaded"
+echo "📋 Loading environment variables from .env.production..."
+set -a  # Automatically export all variables
+source .env.production
+set +a  # Stop automatically exporting
+
+# Validate required environment variables
+echo "🔍 Validating required environment variables..."
+REQUIRED_VARS=("DB_PASSWORD" "REDIS_PASSWORD" "JWT_SECRET" "TELEGRAM_BOT_TOKEN")
+MISSING_VARS=()
+
+for var in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!var}" ]; then
+        MISSING_VARS+=("$var")
+    fi
+done
+
+if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+    echo "❌ Error: Missing required environment variables:"
+    for var in "${MISSING_VARS[@]}"; do
+        echo "   - $var"
+    done
+    echo ""
+    echo "Please set these in .env.production"
+    exit 1
+fi
+
+echo "✅ Environment variables loaded and validated"
 echo ""
 
 # Step 1: Pull latest code
@@ -48,7 +72,7 @@ echo ""
 # Step 2: Restart backend (Docker containers)
 echo "🔄 Step 2: Restarting backend..."
 echo "Stopping old containers..."
-docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.prod.yml --env-file .env.production down
 
 # Free port 8080 if needed
 echo "Freeing port 8080..."
@@ -60,25 +84,58 @@ fi
 sleep 2
 
 echo "Building backend (if needed)..."
-docker-compose -f docker-compose.prod.yml build backend
+docker-compose -f docker-compose.prod.yml --env-file .env.production build backend
 
 echo "Starting backend services..."
-docker-compose -f docker-compose.prod.yml up -d
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
 
-echo "Waiting for services to be healthy..."
-sleep 5
+echo "Waiting for services to start..."
+sleep 10
 
-# Check backend health
-echo "Checking backend health..."
-for i in {1..10}; do
-    if curl -s http://localhost:8080/api/v1/health > /dev/null; then
-        echo "✅ Backend is healthy"
+# Check container status
+echo "Checking container status..."
+docker-compose -f docker-compose.prod.yml ps
+
+# Wait for containers to be healthy
+echo "Waiting for containers to be healthy..."
+MAX_WAIT=60
+WAITED=0
+while [ $WAITED -lt $MAX_WAIT ]; do
+    # Check if postgres is healthy
+    POSTGRES_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' lomi_postgres 2>/dev/null || echo "unknown")
+    # Check if redis is healthy
+    REDIS_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' lomi_redis 2>/dev/null || echo "unknown")
+    # Check if backend is running
+    BACKEND_STATUS=$(docker inspect --format='{{.State.Status}}' lomi_backend 2>/dev/null || echo "unknown")
+    
+    if [ "$POSTGRES_HEALTH" = "healthy" ] && [ "$REDIS_HEALTH" = "healthy" ] && [ "$BACKEND_STATUS" = "running" ]; then
+        echo "✅ All containers are healthy/running"
         break
     fi
-    if [ $i -eq 10 ]; then
-        echo "⚠️  Backend health check failed, but continuing..."
+    
+    echo "Waiting... (Postgres: $POSTGRES_HEALTH, Redis: $REDIS_HEALTH, Backend: $BACKEND_STATUS) - ${WAITED}s/${MAX_WAIT}s"
+    sleep 5
+    WAITED=$((WAITED + 5))
+done
+
+# Check backend health endpoint
+echo ""
+echo "Checking backend health endpoint..."
+for i in {1..15}; do
+    if curl -s -f http://localhost:8080/api/v1/health > /dev/null 2>&1; then
+        echo "✅ Backend is responding on port 8080"
+        curl -s http://localhost:8080/api/v1/health | head -1
+        break
+    fi
+    if [ $i -eq 15 ]; then
+        echo "❌ Backend health check failed after 30 seconds"
+        echo ""
+        echo "Checking backend logs..."
+        docker-compose -f docker-compose.prod.yml logs --tail=50 backend
+        echo ""
+        echo "⚠️  Backend may still be starting. Check logs above."
     else
-        echo "Waiting for backend... ($i/10)"
+        echo "Waiting for backend to respond... ($i/15)"
         sleep 2
     fi
 done
@@ -204,7 +261,18 @@ echo "  Frontend: http://152.53.87.200"
 echo "  API:      https://api.lomi.social/api/v1/health"
 echo ""
 echo "🐳 Docker containers:"
-docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.prod.yml --env-file .env.production ps
+echo ""
+
+# Final health check
+echo "🔍 Final health check..."
+if curl -s -f http://localhost:8080/api/v1/health > /dev/null 2>&1; then
+    echo "✅ Backend is healthy and responding"
+else
+    echo "⚠️  Backend health check failed - check logs:"
+    echo "   docker-compose -f docker-compose.prod.yml logs backend"
+fi
+
 echo ""
 echo "✅ All done! Your app is live 🚀"
 
