@@ -1,26 +1,57 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Dimensions, Platform, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Image, Dimensions, Platform, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING } from '../../theme/colors';
-import { getTelegramInitData, initializeTelegramWebApp, getTelegramWebApp } from '../../utils/telegram';
+import { getTelegramInitData, initializeTelegramWebApp, getTelegramWebApp, getTelegramDebugInfo, isTelegramWebApp } from '../../utils/telegram';
 import { useAuthStore } from '../../store/authStore';
 
 const { width, height } = Dimensions.get('window');
 
 export const WelcomeScreen = ({ navigation }: any) => {
     const { login, isLoading } = useAuthStore();
+    const [isInTelegram, setIsInTelegram] = useState<boolean | null>(null);
 
     useEffect(() => {
-        // Initialize Telegram WebApp
+        // Early detection: Check if we're in Telegram BEFORE doing anything else
         if (Platform.OS === 'web') {
-            initializeTelegramWebApp({ enableFullscreen: false }); // Don't request fullscreen, Telegram handles it
+            const debugInfo = getTelegramDebugInfo();
+            const inTelegram = isTelegramWebApp();
+            
+            // Check if platform is unknown (indicates Safari/external browser)
+            const isActuallyInTelegram = (
+                debugInfo.platform !== 'unknown' && 
+                (debugInfo.platform === 'ios' || 
+                 debugInfo.platform === 'android' || 
+                 debugInfo.platform === 'tdesktop' ||
+                 debugInfo.platform === 'web' ||
+                 debugInfo.platform === 'macos')
+            ) || (
+                // Even if platform is unknown, check other indicators
+                debugInfo.webAppExists && 
+                (debugInfo.url.includes('tgWebApp') || 
+                 debugInfo.search.includes('tgWebApp') ||
+                 debugInfo.hash.includes('tgWebApp') ||
+                 debugInfo.userAgent.includes('Telegram'))
+            );
+            
+            setIsInTelegram(isActuallyInTelegram);
+            
+            if (!isActuallyInTelegram) {
+                console.error('❌ App is NOT in Telegram browser!');
+                console.error('Debug info:', debugInfo);
+                // Don't initialize Telegram WebApp if not in Telegram
+                return;
+            }
+            
+            // Only initialize if we're actually in Telegram
+            initializeTelegramWebApp({ enableFullscreen: false });
         }
         
-        // Setup Telegram MainButton for native login
+        // Setup Telegram MainButton for native login (only if in Telegram)
         const webApp = getTelegramWebApp();
-        if (webApp && Platform.OS === 'web') {
+        if (webApp && Platform.OS === 'web' && isInTelegram) {
             // Use Telegram's native MainButton
             webApp.MainButton.setText('Continue with Telegram');
             webApp.MainButton.show();
@@ -46,7 +77,7 @@ export const WelcomeScreen = ({ navigation }: any) => {
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // handleLogin is stable, no need to include in deps
+    }, [isInTelegram]); // Include isInTelegram in deps
 
     const handleLogin = async () => {
         try {
@@ -249,6 +280,70 @@ export const WelcomeScreen = ({ navigation }: any) => {
         }
     };
 
+    // Show warning screen if NOT opened from Telegram
+    if (Platform.OS === 'web' && isInTelegram === false) {
+        const debugInfo = getTelegramDebugInfo();
+        return (
+            <View style={styles.container}>
+                <LinearGradient
+                    colors={['#1a1a1a', '#000000']}
+                    style={styles.gradient}
+                />
+                <SafeAreaView style={styles.errorContent}>
+                    <ScrollView contentContainerStyle={styles.errorScroll}>
+                        <View style={styles.errorHeader}>
+                            <Text style={styles.errorEmoji}>⚠️</Text>
+                            <Text style={styles.errorTitle}>Open from Telegram</Text>
+                        </View>
+                        
+                        <View style={styles.errorBox}>
+                            <Text style={styles.errorMessage}>
+                                This app must be opened from <Text style={styles.highlight}>Telegram's in-app browser</Text>, not Safari or other browsers.
+                            </Text>
+                        </View>
+
+                        <View style={styles.instructionsBox}>
+                            <Text style={styles.instructionsTitle}>📱 How to Open Correctly:</Text>
+                            <View style={styles.stepContainer}>
+                                <Text style={styles.stepNumber}>1</Text>
+                                <Text style={styles.stepText}>Open the <Text style={styles.bold}>Telegram app</Text> (not Safari)</Text>
+                            </View>
+                            <View style={styles.stepContainer}>
+                                <Text style={styles.stepNumber}>2</Text>
+                                <Text style={styles.stepText}>Search for your bot</Text>
+                            </View>
+                            <View style={styles.stepContainer}>
+                                <Text style={styles.stepNumber}>3</Text>
+                                <Text style={styles.stepText}>Tap the <Text style={styles.bold}>menu button (☰)</Text> at the bottom</Text>
+                            </View>
+                            <View style={styles.stepContainer}>
+                                <Text style={styles.stepNumber}>4</Text>
+                                <Text style={styles.stepText}>Tap <Text style={styles.bold}>"Mini App"</Text> from the menu</Text>
+                            </View>
+                        </View>
+
+                        <View style={styles.dontBox}>
+                            <Text style={styles.dontTitle}>❌ Don't:</Text>
+                            <Text style={styles.dontText}>• Type URL in Safari</Text>
+                            <Text style={styles.dontText}>• Open from browser bookmark</Text>
+                            <Text style={styles.dontText}>• Share link and open in browser</Text>
+                        </View>
+
+                        {__DEV__ && (
+                            <View style={styles.debugBox}>
+                                <Text style={styles.debugTitle}>🔍 Debug Info:</Text>
+                                <Text style={styles.debugText}>Platform: {debugInfo.platform}</Text>
+                                <Text style={styles.debugText}>User Agent: {debugInfo.userAgent.substring(0, 60)}...</Text>
+                                <Text style={styles.debugText}>WebApp Exists: {debugInfo.webAppExists ? 'Yes' : 'No'}</Text>
+                                <Text style={styles.debugText}>Has InitData: {debugInfo.hasInitData ? 'Yes' : 'No'}</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+                </SafeAreaView>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
             {/* Background Image / Gradient */}
@@ -394,5 +489,120 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.textSecondary,
         fontStyle: 'italic',
+    },
+    // Error/Warning screen styles
+    errorContent: {
+        flex: 1,
+        padding: SPACING.l,
+    },
+    errorScroll: {
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
+    errorHeader: {
+        alignItems: 'center',
+        marginBottom: SPACING.xl,
+    },
+    errorEmoji: {
+        fontSize: 64,
+        marginBottom: SPACING.m,
+    },
+    errorTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        textAlign: 'center',
+        marginBottom: SPACING.m,
+    },
+    errorBox: {
+        backgroundColor: 'rgba(255, 193, 7, 0.1)',
+        borderColor: '#FFC107',
+        borderWidth: 2,
+        borderRadius: 12,
+        padding: SPACING.l,
+        marginBottom: SPACING.l,
+    },
+    errorMessage: {
+        fontSize: 16,
+        color: COLORS.textPrimary,
+        lineHeight: 24,
+        textAlign: 'center',
+    },
+    instructionsBox: {
+        backgroundColor: 'rgba(167, 255, 131, 0.1)',
+        borderColor: COLORS.primary,
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: SPACING.l,
+        marginBottom: SPACING.l,
+    },
+    instructionsTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.primary,
+        marginBottom: SPACING.m,
+    },
+    stepContainer: {
+        flexDirection: 'row',
+        marginBottom: SPACING.m,
+        alignItems: 'flex-start',
+    },
+    stepNumber: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.primary,
+        width: 30,
+        textAlign: 'center',
+        marginRight: SPACING.m,
+    },
+    stepText: {
+        flex: 1,
+        fontSize: 16,
+        color: COLORS.textPrimary,
+        lineHeight: 24,
+    },
+    bold: {
+        fontWeight: 'bold',
+        color: COLORS.primary,
+    },
+    dontBox: {
+        backgroundColor: 'rgba(255, 82, 82, 0.1)',
+        borderColor: '#FF5252',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: SPACING.l,
+        marginBottom: SPACING.l,
+    },
+    dontTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#FF5252',
+        marginBottom: SPACING.m,
+    },
+    dontText: {
+        fontSize: 16,
+        color: COLORS.textPrimary,
+        lineHeight: 24,
+        marginBottom: SPACING.xs,
+    },
+    debugBox: {
+        backgroundColor: 'rgba(100, 100, 100, 0.2)',
+        borderColor: '#666',
+        borderWidth: 1,
+        borderRadius: 12,
+        padding: SPACING.m,
+        marginTop: SPACING.l,
+    },
+    debugTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: COLORS.textSecondary,
+        marginBottom: SPACING.xs,
+    },
+    debugText: {
+        fontSize: 12,
+        color: COLORS.textTertiary,
+        fontFamily: 'monospace',
+        marginBottom: SPACING.xs,
     },
 });
