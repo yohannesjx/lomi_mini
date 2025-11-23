@@ -180,6 +180,14 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
+			// Check if user already exists (race condition protection)
+			var existingUser models.User
+			checkResult := database.DB.Where("telegram_id = ?", tgUser.ID).First(&existingUser)
+			if checkResult.Error == nil {
+				// User was created between our check and now, use existing user
+				user = existingUser
+				log.Printf("✅ User already exists (race condition): ID=%s, TelegramID=%d", user.ID, user.TelegramID)
+			} else if checkResult.Error == gorm.ErrRecordNotFound {
 			// Create new user with required fields
 			// Use full name from Telegram (first_name + last_name)
 			fullName := strings.TrimSpace(tgUser.FirstName + " " + tgUser.LastName)
@@ -217,15 +225,32 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 
 			if err := database.DB.Create(&user).Error; err != nil {
 				log.Printf("❌ Failed to create user: %v", err)
-				log.Printf("❌ User data: TelegramID=%d, Name=%s, Age=%d, Gender=%s, City=%s, Religion=%s",
-					user.TelegramID, user.Name, user.Age, user.Gender, user.City, user.Religion)
+				log.Printf("❌ Error type: %T", err)
+				log.Printf("❌ User data: TelegramID=%d, Name=%s, Age=%d, Gender=%s, City=%s, Religion=%s, VerificationStatus=%s",
+					user.TelegramID, user.Name, user.Age, user.Gender, user.City, user.Religion, user.VerificationStatus)
 				
-				// Return more detailed error for debugging
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error":   "Could not create user",
-					"details": err.Error(),
-					"debug":   fmt.Sprintf("TelegramID: %d, Name: %s", user.TelegramID, user.Name),
-				})
+				// Check for duplicate key error (user already exists)
+				if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "UNIQUE constraint") {
+					log.Printf("⚠️ User already exists, fetching existing user...")
+					// Try to fetch the existing user
+					if fetchErr := database.DB.Where("telegram_id = ?", tgUser.ID).First(&user).Error; fetchErr == nil {
+						log.Printf("✅ Found existing user: ID=%s", user.ID)
+						// Continue with existing user instead of failing
+					} else {
+						return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+							"error":   "Could not create or find user",
+							"details": err.Error(),
+						})
+					}
+				} else {
+					// Return detailed error for other database errors
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"error":   "Could not create user",
+						"details": err.Error(),
+						"debug": fmt.Sprintf("TelegramID: %d, Name: %s, ErrorType: %T", 
+							user.TelegramID, user.Name, err),
+					})
+				}
 			}
 
 			log.Printf("✅ Created new user: ID=%s, TelegramID=%d", user.ID, user.TelegramID)
