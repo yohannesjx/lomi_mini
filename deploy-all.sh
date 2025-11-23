@@ -117,11 +117,8 @@ cd "$PROJECT_DIR"
 # Step 4: Update and reload Caddy
 echo "🔄 Step 4: Updating Caddy configuration..."
 
-# Check if fixed Caddyfile exists (from the fix)
-if [ -f "Caddyfile.fixed" ]; then
-    echo "📝 Found Caddyfile.fixed - using the fixed version"
-    sudo cp Caddyfile.fixed /etc/caddy/Caddyfile
-elif [ -f "Caddyfile" ]; then
+# Use main Caddyfile (not .fixed version which has logging issues)
+if [ -f "Caddyfile" ]; then
     echo "📝 Using Caddyfile from repo"
     sudo cp Caddyfile /etc/caddy/Caddyfile
 else
@@ -135,31 +132,46 @@ if [ -f "/etc/caddy/Caddyfile" ]; then
         echo "Creating backup of current Caddyfile..."
         sudo cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.backup 2>/dev/null || true
         
-        echo "Reloading Caddy..."
-        # Use restart instead of reload to avoid hangs
-        # Reload can hang if SSL cert acquisition is in progress
-        if timeout 15 sudo systemctl restart caddy; then
-            echo "✅ Caddy restarted with new configuration"
+        echo "Stopping Caddy first..."
+        sudo systemctl stop caddy 2>/dev/null || true
+        sleep 2
+        
+        echo "Starting Caddy with new configuration..."
+        # Use start instead of restart to avoid issues
+        if timeout 20 sudo systemctl start caddy; then
             sleep 3
             # Verify Caddy is running
             if sudo systemctl is-active --quiet caddy; then
-                echo "✅ Caddy is running"
+                echo "✅ Caddy started successfully"
             else
-                echo "⚠️  Caddy restart may have failed, checking status..."
-                sudo systemctl status caddy --no-pager -l | head -10
+                echo "❌ Caddy failed to start!"
+                echo "Checking Caddy status and logs..."
+                sudo systemctl status caddy --no-pager -l | head -20
+                echo ""
+                echo "Recent Caddy logs:"
+                sudo journalctl -u caddy -n 30 --no-pager | tail -20
+                echo ""
                 echo "Attempting to restore backup..."
                 if [ -f "/etc/caddy/Caddyfile.backup" ]; then
                     sudo cp /etc/caddy/Caddyfile.backup /etc/caddy/Caddyfile
-                    sudo systemctl restart caddy || true
+                    sudo systemctl start caddy || true
+                    sleep 2
+                    if sudo systemctl is-active --quiet caddy; then
+                        echo "✅ Restored backup and Caddy is running"
+                    else
+                        echo "❌ Caddy still failing even with backup"
+                    fi
                 fi
             fi
         else
-            echo "⚠️  Caddy restart timed out or failed"
-            echo "This usually means SSL certificate acquisition is hanging"
-            echo "Restoring backup and trying again..."
+            echo "❌ Caddy start timed out or failed"
+            echo "Checking what went wrong..."
+            sudo journalctl -u caddy -n 30 --no-pager | tail -20
+            echo ""
+            echo "Restoring backup..."
             if [ -f "/etc/caddy/Caddyfile.backup" ]; then
                 sudo cp /etc/caddy/Caddyfile.backup /etc/caddy/Caddyfile
-                sudo systemctl restart caddy || sudo systemctl start caddy || true
+                sudo systemctl start caddy || true
             fi
         fi
     else
