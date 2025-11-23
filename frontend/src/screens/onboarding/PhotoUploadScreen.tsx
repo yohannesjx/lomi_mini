@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
+import { useOnboardingStore } from '../../store/onboardingStore';
 import axios from 'axios';
 
 interface PhotoData {
@@ -25,6 +26,7 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
         { uri: null, fileKey: null, isUploading: false },
     ]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { updateStep } = useOnboardingStore();
 
     const pickImage = async (index: number) => {
         // Request permissions

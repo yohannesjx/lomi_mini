@@ -1,8 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
+import { UserService } from '../../api/services';
+import { useOnboardingStore } from '../../store/onboardingStore';
+import { useAuthStore } from '../../store/authStore';
 
 const INTERESTS = [
     { id: 'buna', label: '☕ Buna Lover', category: 'Culture' },
@@ -24,22 +27,53 @@ const INTERESTS = [
 
 export const InterestsScreen = ({ navigation }: any) => {
     const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+    const { updateStep } = useOnboardingStore();
+    const { user } = useAuthStore();
+
+    useEffect(() => {
+        // Load existing interests if available
+        if (user?.interests && Array.isArray(user.interests)) {
+            setSelectedInterests(user.interests);
+        }
+    }, [user]);
 
     const toggleInterest = (id: string) => {
         if (selectedInterests.includes(id)) {
             setSelectedInterests(selectedInterests.filter(i => i !== id));
         } else {
             if (selectedInterests.length >= 5) {
-                alert('You can only select up to 5 interests');
+                Alert.alert('Limit Reached', 'You can only select up to 5 interests');
                 return;
             }
             setSelectedInterests([...selectedInterests, id]);
         }
     };
 
-    const handleFinish = () => {
-        // Navigate to Gender Preference screen
-        navigation.navigate('GenderPreference');
+    const handleFinish = async () => {
+        if (selectedInterests.length < 3) {
+            Alert.alert('Select More Interests', 'Please select at least 3 interests to continue.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            // Save interests to profile
+            await UserService.updateProfile({
+                interests: selectedInterests,
+            });
+
+            // Update onboarding step to 7 (bio & interests done)
+            await updateStep(7);
+
+            // Navigate to completion screen
+            navigation.navigate('OnboardingComplete');
+        } catch (error: any) {
+            console.error('Save interests error:', error);
+            Alert.alert('Error', 'Failed to save interests. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -81,7 +115,8 @@ export const InterestsScreen = ({ navigation }: any) => {
                     <Button
                         title="Finish Profile"
                         onPress={handleFinish}
-                        disabled={selectedInterests.length < 3}
+                        disabled={selectedInterests.length < 3 || isSaving}
+                        loading={isSaving}
                         size="large"
                     />
                 </View>

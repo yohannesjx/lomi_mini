@@ -15,10 +15,7 @@ const SplashScreen = () => (
     </View>
 );
 import { WelcomeScreen } from './src/screens/onboarding/WelcomeScreen';
-import { ProfileSetupScreen } from './src/screens/onboarding/ProfileSetupScreen';
-import { GenderPreferenceScreen } from './src/screens/onboarding/GenderPreferenceScreen';
-import { PhotoUploadScreen } from './src/screens/onboarding/PhotoUploadScreen';
-import { InterestsScreen } from './src/screens/onboarding/InterestsScreen';
+import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthGuard } from './src/components/AuthGuard';
 
 import { MainTabNavigator } from './src/navigation/MainTabNavigator';
@@ -137,10 +134,7 @@ export default function App() {
                     }}
                 >
                     <Stack.Screen name="Welcome" component={WelcomeScreen} />
-                    <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
-                    <Stack.Screen name="GenderPreference" component={GenderPreferenceScreen} />
-                    <Stack.Screen name="PhotoUpload" component={PhotoUploadScreen} />
-                    <Stack.Screen name="Interests" component={InterestsScreen} />
+                    <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
                     <Stack.Screen name="Main" component={MainTabNavigator} />
                     <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
                     <Stack.Screen name="BuyCoins" component={BuyCoinsScreen} />

@@ -1,39 +1,58 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
+import { useOnboardingStore } from '../../store/onboardingStore';
 
 export const GenderPreferenceScreen = ({ navigation }: any) => {
     const [lookingFor, setLookingFor] = useState<'male' | 'female' | null>(null);
+    const [relationshipGoal, setRelationshipGoal] = useState<'friends' | 'dating' | 'serious' | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const { updateStep } = useOnboardingStore();
+    const { user } = useAuthStore();
+
+    useEffect(() => {
+        // Load existing preferences if available
+        if (user) {
+            if (user.preferences?.looking_for) {
+                setLookingFor(user.preferences.looking_for);
+            }
+            if (user.relationship_goal) {
+                setRelationshipGoal(user.relationship_goal);
+            }
+        }
+    }, [user]);
 
     const handleNext = async () => {
-        if (!lookingFor) return;
+        if (!lookingFor || !relationshipGoal) {
+            Alert.alert('Complete All Fields', 'Please select both who you\'re looking for and your relationship goal.');
+            return;
+        }
 
         setIsSaving(true);
         try {
-            // Save gender preference to user preferences
-            const currentUser = useAuthStore.getState().user;
-            const currentPreferences = currentUser?.preferences || {};
+            // Save preferences and relationship goal
+            const currentPreferences = user?.preferences || {};
             
             await UserService.updateProfile({
                 preferences: {
                     ...currentPreferences,
                     looking_for: lookingFor,
                 },
+                relationship_goal: relationshipGoal,
             });
 
-            // Navigate to Main App
-            navigation.navigate('Main');
+            // Update onboarding step to 3 (looking for + goal done)
+            await updateStep(3);
+
+            // Navigate to next step (religion)
+            navigation.navigate('Religion');
         } catch (error: any) {
             console.error('Save preference error:', error);
-            // In dev mode, continue even if API fails
-            if (__DEV__) {
-                navigation.navigate('Main');
-            }
+            Alert.alert('Error', 'Failed to save preferences. Please try again.');
         } finally {
             setIsSaving(false);
         }

@@ -121,16 +121,17 @@ export const AuthGuard: React.FC<{
                 return;
             }
 
-            // Check if user has completed onboarding
-            // has_profile indicates if user has filled in profile details (city, bio, etc.)
-            const hasCompletedOnboarding = currentUser.has_profile === true;
+            // Check onboarding status from user object
+            const onboardingCompleted = currentUser.onboarding_completed === true;
+            const onboardingStep = currentUser.onboarding_step || 0;
 
             console.log('📊 User onboarding status:', {
+                onboarding_step: onboardingStep,
+                onboarding_completed: onboardingCompleted,
                 has_profile: currentUser.has_profile,
-                hasCompletedOnboarding,
             });
 
-            if (hasCompletedOnboarding) {
+            if (onboardingCompleted) {
                 // User has completed onboarding, go to main app
                 console.log('✅ User has completed onboarding, navigating to Main');
                 navigationRef.current.reset({
@@ -138,11 +139,12 @@ export const AuthGuard: React.FC<{
                     routes: [{ name: 'Main' }],
                 });
             } else {
-                // New user, start onboarding
-                console.log('🆕 New user detected, starting onboarding');
+                // User hasn't completed onboarding, go to onboarding navigator
+                // The OnboardingNavigator will determine which step to show
+                console.log(`🆕 User onboarding in progress (step ${onboardingStep}), navigating to Onboarding`);
                 navigationRef.current.reset({
                     index: 0,
-                    routes: [{ name: 'ProfileSetup' }],
+                    routes: [{ name: 'Onboarding' }],
                 });
             }
         }, 100);

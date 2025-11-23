@@ -1,20 +1,60 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
+import { UserService } from '../../api/services';
+import { useOnboardingStore } from '../../store/onboardingStore';
+import { useAuthStore } from '../../store/authStore';
 
 export const ProfileSetupScreen = ({ navigation }: any) => {
     const [name, setName] = useState('');
     const [age, setAge] = useState('');
     const [gender, setGender] = useState<'male' | 'female' | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const { updateStep } = useOnboardingStore();
+    const { user } = useAuthStore();
 
-    const handleNext = () => {
+    useEffect(() => {
+        // Load existing data if available
+        if (user) {
+            if (user.name && user.name !== 'User') setName(user.name);
+            if (user.age && user.age > 18) setAge(user.age.toString());
+            if (user.gender) setGender(user.gender);
+        }
+    }, [user]);
+
+    const handleNext = async () => {
         // Validate inputs
         if (!name || !age || !gender) return;
 
-        navigation.navigate('PhotoUpload');
+        const ageNum = parseInt(age, 10);
+        if (isNaN(ageNum) || ageNum < 18 || ageNum > 100) {
+            Alert.alert('Invalid Age', 'Please enter a valid age between 18 and 100.');
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            // Save profile data
+            await UserService.updateProfile({
+                name: name.trim(),
+                age: ageNum,
+                gender,
+            });
+
+            // Update onboarding step to 1 (age & gender done)
+            await updateStep(1);
+
+            // Navigate to next step (city)
+            navigation.navigate('City');
+        } catch (error: any) {
+            console.error('Save profile error:', error);
+            Alert.alert('Error', 'Failed to save profile. Please try again.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const GenderOption = ({ type, label, icon }: { type: 'male' | 'female', label: string, icon: string }) => (
@@ -74,7 +114,8 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
                         <Button
                             title="Next Step"
                             onPress={handleNext}
-                            disabled={!name || !age || !gender}
+                            disabled={!name || !age || !gender || isSaving}
+                            loading={isSaving}
                             size="large"
                         />
                     </View>
