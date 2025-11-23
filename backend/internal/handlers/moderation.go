@@ -103,13 +103,21 @@ func UploadComplete(c *fiber.Ctx) error {
 			bucket = config.Cfg.S3BucketVideos
 		}
 		
-		// Generate R2 URL for worker to download
-		// Use S3 endpoint to construct public URL
-		r2URL := fmt.Sprintf("%s/%s/%s", 
-			config.Cfg.S3Endpoint,
-			bucket,
-			photo.FileKey,
-		)
+		// Generate presigned download URL for worker (valid for 1 hour)
+		ctx := c.Context()
+		r2URL, err := database.GeneratePresignedDownloadURL(ctx, bucket, photo.FileKey, 1*time.Hour)
+		if err != nil {
+			log.Printf("❌ Failed to generate presigned download URL for %s: %v", photo.FileKey, err)
+			// Fallback: construct public URL (if bucket is public)
+			r2URL = fmt.Sprintf("%s/%s/%s", 
+				config.Cfg.S3Endpoint,
+				bucket,
+				photo.FileKey,
+			)
+			log.Printf("⚠️ Using fallback public URL: %s", r2URL)
+		} else {
+			log.Printf("✅ Generated presigned download URL for %s (expires in 1h)", photo.FileKey)
+		}
 
 		jobPhotos = append(jobPhotos, queue.PhotoJob{
 			MediaID: media.ID.String(),
