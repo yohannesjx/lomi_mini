@@ -1,76 +1,20 @@
-# Caddyfile for Lomi Social - WORKING VERSION
-# Minimal, tested configuration
+# Caddyfile for Lomi Social
+# Ultra-minimal working configuration
 
-# HTTP-only block for IP address (no SSL)
 :80 {
-    # Handle API requests
-    handle /api/* {
-        reverse_proxy localhost:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-            header_up X-Forwarded-For {remote}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
+    reverse_proxy /api/* localhost:8080
+    reverse_proxy /ws localhost:8080
     
-    # Handle WebSocket
-    handle /ws {
-        reverse_proxy localhost:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-        }
-    }
-    
-    # Handle frontend (SPA)
-    handle {
-        root * /var/www/lomi-frontend
-        try_files {path} /index.html
-        file_server
-    }
-    
-    # CORS headers
-    header {
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-    }
-    
-    encode gzip
+    root * /var/www/lomi-frontend
+    try_files {path} /index.html
+    file_server
 }
 
-# Domain-based block (automatic HTTPS/SSL)
-lomi.social, www.lomi.social {
-    # Handle API requests
-    handle /api/* {
-        reverse_proxy localhost:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-            header_up X-Forwarded-For {remote}
-            header_up X-Forwarded-Proto {scheme}
-        }
-    }
+lomi.social {
+    reverse_proxy /api/* localhost:8080
+    reverse_proxy /ws localhost:8080
     
-    # Handle WebSocket
-    handle /ws {
-        reverse_proxy localhost:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-        }
-    }
-    
-    # Handle frontend (SPA)
-    handle {
-        root * /var/www/lomi-frontend
-        try_files {path} /index.html
-        file_server
-    }
-    
-    # CORS headers
-    header {
-        Access-Control-Allow-Origin "*"
-        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-    }
-    
-    encode gzip
+    root * /var/www/lomi-frontend
+    try_files {path} /index.html
+    file_server
 }
