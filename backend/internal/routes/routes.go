@@ -46,6 +46,7 @@ func SetupRoutes(app *fiber.App) {
 	// User Profile
 	protected.Get("/users/me", handlers.GetMe)
 	protected.Put("/users/me", handlers.UpdateProfile)
+	protected.Get("/users", handlers.GetAllUsers) // List all users (for testing)
 
 	// Media
 	protected.Post("/users/media", handlers.UploadMedia)

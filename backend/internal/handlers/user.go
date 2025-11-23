@@ -32,6 +32,92 @@ func GetMe(c *fiber.Ctx) error {
 	return c.JSON(dbUser)
 }
 
+// GetAllUsers lists all users (for testing/admin purposes)
+func GetAllUsers(c *fiber.Ctx) error {
+	var users []models.User
+	
+	// Get query parameters
+	limit := c.QueryInt("limit", 100)
+	offset := c.QueryInt("offset", 0)
+	telegramOnly := c.QueryBool("telegram_only", false)
+	
+	query := database.DB
+	
+	// Filter to only users with Telegram ID if requested
+	if telegramOnly {
+		query = query.Where("telegram_id IS NOT NULL AND telegram_id > 0")
+	}
+	
+	// Order by creation date (newest first)
+	query = query.Order("created_at DESC")
+	
+	// Apply limit and offset
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if offset > 0 {
+		query = query.Offset(offset)
+	}
+	
+	if err := query.Find(&users).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to fetch users",
+			"details": err.Error(),
+		})
+	}
+	
+	// Count total users
+	var totalCount int64
+	countQuery := database.DB.Model(&models.User{})
+	if telegramOnly {
+		countQuery = countQuery.Where("telegram_id IS NOT NULL AND telegram_id > 0")
+	}
+	countQuery.Count(&totalCount)
+	
+	// Format response with only relevant fields
+	type UserSummary struct {
+		ID                string `json:"id"`
+		TelegramID        *int64 `json:"telegram_id"`
+		TelegramUsername  string `json:"telegram_username"`
+		TelegramFirstName string `json:"telegram_first_name"`
+		TelegramLastName  string `json:"telegram_last_name"`
+		Name              string `json:"name"`
+		Email             string `json:"email"`
+		Age               int    `json:"age"`
+		Gender            string `json:"gender"`
+		City              string `json:"city"`
+		CreatedAt         string `json:"created_at"`
+		UpdatedAt         string `json:"updated_at"`
+	}
+	
+	summaries := make([]UserSummary, 0, len(users))
+	for _, u := range users {
+		summaries = append(summaries, UserSummary{
+			ID:                u.ID.String(),
+			TelegramID:        u.TelegramID,
+			TelegramUsername:  u.TelegramUsername,
+			TelegramFirstName: u.TelegramFirstName,
+			TelegramLastName:  u.TelegramLastName,
+			Name:              u.Name,
+			Email:             u.Email,
+			Age:               u.Age,
+			Gender:            string(u.Gender),
+			City:              u.City,
+			CreatedAt:         u.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt:         u.UpdatedAt.Format("2006-01-02 15:04:05"),
+		})
+	}
+	
+	return c.JSON(fiber.Map{
+		"users":       summaries,
+		"count":       len(summaries),
+		"total_count": totalCount,
+		"limit":       limit,
+		"offset":      offset,
+		"telegram_only": telegramOnly,
+	})
+}
+
 func UpdateProfile(c *fiber.Ctx) error {
 	user := c.Locals("user").(*jwt.Token)
 	claims := user.Claims.(jwt.MapClaims)
