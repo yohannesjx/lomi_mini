@@ -1,40 +1,15 @@
-# Caddyfile for Lomi Social - FIXED VERSION
-# Place this in /etc/caddy/Caddyfile on your server
-# Server IP: 152.53.87.200
+# Caddyfile for Lomi Social - WORKING VERSION
+# Minimal, tested configuration
 
 # HTTP-only block for IP address (no SSL)
-# Use this when accessing via IP: http://152.53.87.200
 :80 {
-    # Logging for debugging
-    log {
-        output file /var/log/caddy/access.log
-        format json
-    }
-
-    # Handle preflight OPTIONS requests FIRST
-    @options {
-        method OPTIONS
-    }
-    handle @options {
-        header {
-            Access-Control-Allow-Origin "*"
-            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-            Access-Control-Max-Age "3600"
-        }
-        respond 204
-    }
-    
-    # Handle API requests (MUST come before static file serving)
-    handle_path /api/* {
+    # Handle API requests
+    handle /api/* {
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
             header_up X-Forwarded-For {remote}
             header_up X-Forwarded-Proto {scheme}
-            
-            # Don't modify response headers from backend
-            header_down Access-Control-Allow-Origin "*"
         }
     }
     
@@ -43,67 +18,35 @@
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
-            header_up X-Forwarded-For {remote}
-            header_up X-Forwarded-Proto {scheme}
         }
     }
     
-    # Handle frontend (SPA - only for non-API routes)
+    # Handle frontend (SPA)
     handle {
         root * /var/www/lomi-frontend
         try_files {path} /index.html
         file_server
-        
-        # Security headers for frontend only
-        header {
-            X-Content-Type-Options "nosniff"
-            X-Frame-Options "DENY"
-            X-XSS-Protection "1; mode=block"
-        }
     }
     
-    encode gzip zstd
+    # CORS headers
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    }
+    
+    encode gzip
 }
 
-# Domain-based blocks (automatic HTTPS/SSL)
-# Use this when DNS is configured: https://lomi.social
+# Domain-based block (automatic HTTPS/SSL)
 lomi.social, www.lomi.social {
-    # Logging for debugging
-    log {
-        output file /var/log/caddy/lomi-access.log
-        format json
-    }
-
-    # Handle preflight OPTIONS requests FIRST
-    @options {
-        method OPTIONS
-    }
-    handle @options {
-        header {
-            Access-Control-Allow-Origin "*"
-            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-            Access-Control-Max-Age "3600"
-        }
-        respond 204
-    }
-    
-    # Handle API requests (MUST come before static file serving)
-    # Use handle_path to strip /api prefix before proxying
-    handle_path /api/* {
+    # Handle API requests
+    handle /api/* {
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
             header_up X-Forwarded-For {remote}
             header_up X-Forwarded-Proto {scheme}
-            
-            # Don't modify response headers from backend
-            header_down Access-Control-Allow-Origin "*"
-            
-            # Health check
-            health_uri /api/v1/health
-            health_interval 30s
-            health_timeout 5s
         }
     }
     
@@ -112,86 +55,22 @@ lomi.social, www.lomi.social {
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
-            header_up X-Forwarded-For {remote}
-            header_up X-Forwarded-Proto {scheme}
         }
     }
     
-    # Serve static files (SPA - only for non-API routes)
+    # Handle frontend (SPA)
     handle {
         root * /var/www/lomi-frontend
         try_files {path} /index.html
         file_server
-        
-        # Security headers for frontend only
-        header {
-            X-Content-Type-Options "nosniff"
-            X-Frame-Options "DENY"
-            X-XSS-Protection "1; mode=block"
-            Referrer-Policy "strict-origin-when-cross-origin"
-            Permissions-Policy "geolocation=(), microphone=(), camera=()"
-        }
     }
     
-    # Compression
-    encode gzip zstd
-}
-
-# Backend API subdomain (optional)
-# Access via: https://api.lomi.social/api/v1/health
-api.lomi.social {
-    # Logging
-    log {
-        output file /var/log/caddy/api-access.log
-        format json
-    }
-
-    # Handle preflight OPTIONS requests
-    @options {
-        method OPTIONS
-    }
-    handle @options {
-        header {
-            Access-Control-Allow-Origin "*"
-            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-            Access-Control-Max-Age "3600"
-        }
-        respond 204
+    # CORS headers
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
     }
     
-    # Handle WebSocket
-    handle /ws {
-        reverse_proxy localhost:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-        }
-    }
-    
-    # Handle all API requests
-    handle_path /api/* {
-        reverse_proxy localhost:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-            
-            # Don't modify response headers
-            header_down Access-Control-Allow-Origin "*"
-            
-            # Health check
-            health_uri /api/v1/health
-            health_interval 30s
-            health_timeout 5s
-        }
-    }
-    
-    # Fallback: proxy everything to backend
-    handle {
-        reverse_proxy localhost:8080 {
-            header_up Host {host}
-            header_up X-Real-IP {remote}
-        }
-    }
-    
-    # Compression
-    encode gzip zstd
+    encode gzip
 }
