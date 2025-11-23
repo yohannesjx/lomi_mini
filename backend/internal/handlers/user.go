@@ -45,7 +45,7 @@ func GetAllUsers(c *fiber.Ctx) error {
 	
 	// Filter to only users with Telegram ID if requested
 	if telegramOnly {
-		query = query.Where("telegram_id IS NOT NULL AND telegram_id > 0")
+		query = query.Where("telegram_id > 0")
 	}
 	
 	// Order by creation date (newest first)
@@ -70,19 +70,18 @@ func GetAllUsers(c *fiber.Ctx) error {
 	var totalCount int64
 	countQuery := database.DB.Model(&models.User{})
 	if telegramOnly {
-		countQuery = countQuery.Where("telegram_id IS NOT NULL AND telegram_id > 0")
+		countQuery = countQuery.Where("telegram_id > 0")
 	}
 	countQuery.Count(&totalCount)
 	
 	// Format response with only relevant fields
 	type UserSummary struct {
 		ID                string `json:"id"`
-		TelegramID        *int64 `json:"telegram_id"`
+		TelegramID        int64  `json:"telegram_id"`
 		TelegramUsername  string `json:"telegram_username"`
 		TelegramFirstName string `json:"telegram_first_name"`
 		TelegramLastName  string `json:"telegram_last_name"`
 		Name              string `json:"name"`
-		Email             string `json:"email"`
 		Age               int    `json:"age"`
 		Gender            string `json:"gender"`
 		City              string `json:"city"`
@@ -99,7 +98,6 @@ func GetAllUsers(c *fiber.Ctx) error {
 			TelegramFirstName: u.TelegramFirstName,
 			TelegramLastName:  u.TelegramLastName,
 			Name:              u.Name,
-			Email:             u.Email,
 			Age:               u.Age,
 			Gender:            string(u.Gender),
 			City:              u.City,
