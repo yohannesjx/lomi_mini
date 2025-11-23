@@ -178,14 +178,43 @@ export const WelcomeScreen = ({ navigation }: any) => {
             }
             
             console.log('✅ InitData found, attempting login...');
-            await login(initData);
+            console.log('📤 Sending login request with initData length:', initData.length);
             
-            // Check if user has completed profile
-            const user = useAuthStore.getState().user;
-            if (user?.has_profile) {
-                navigation.navigate('Main');
-            } else {
-                navigation.navigate('ProfileSetup');
+            try {
+                await login(initData);
+                
+                // Check if user has completed profile
+                const user = useAuthStore.getState().user;
+                if (user?.has_profile) {
+                    navigation.navigate('Main');
+                } else {
+                    navigation.navigate('ProfileSetup');
+                }
+            } catch (loginError: any) {
+                console.error('❌ Login API error:', loginError);
+                console.error('Error details:', {
+                    message: loginError?.message,
+                    response: loginError?.response?.data,
+                    status: loginError?.response?.status,
+                    statusText: loginError?.response?.statusText,
+                });
+                
+                // Show detailed error
+                const errorMsg = loginError?.response?.data?.error || 
+                                loginError?.response?.data?.message ||
+                                loginError?.message || 
+                                'Login failed. Please try again.';
+                
+                const fullErrorMsg = `❌ Login Failed\n\n` +
+                    `Error: ${errorMsg}\n\n` +
+                    `Status: ${loginError?.response?.status || 'Unknown'}\n\n` +
+                    `If this persists:\n` +
+                    `1. Check your internet connection\n` +
+                    `2. Verify backend is running\n` +
+                    `3. Try again in a moment`;
+                
+                alert(fullErrorMsg);
+                throw loginError; // Re-throw to be caught by outer catch
             }
         } catch (error: any) {
             console.error('Login error:', error);
