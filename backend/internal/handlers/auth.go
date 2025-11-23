@@ -181,9 +181,10 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			// Create new user with required fields
-			firstName := tgUser.FirstName
-			if firstName == "" {
-				firstName = "User" // Fallback if first name is empty
+			// Use full name from Telegram (first_name + last_name)
+			fullName := strings.TrimSpace(tgUser.FirstName + " " + tgUser.LastName)
+			if fullName == "" {
+				fullName = "User" // Fallback if name is empty
 			}
 
 			// Create user with minimal required fields for Telegram authentication
@@ -193,7 +194,7 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 				TelegramFirstName: tgUser.FirstName,
 				TelegramLastName:  tgUser.LastName,
 
-				Name:               firstName,
+				Name:               fullName, // Pre-fill with Telegram name
 				Age:                18,
 				Gender:             models.GenderOther,
 				City:               "Not Set",
