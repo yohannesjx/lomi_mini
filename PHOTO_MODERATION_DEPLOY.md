@@ -26,10 +26,10 @@ echo "COMPREFACE_DB_PASSWORD=compreface123" >> .env.production
 ### Step 4: Build and Start New Services
 ```bash
 # Build CompreFace and moderator workers
-docker-compose -f docker-compose.prod.yml build compreface moderator-worker
+docker-compose -f docker-compose.prod.yml --env-file .env.production build compreface moderator-worker
 
-# Start all services (including new ones)
-docker-compose -f docker-compose.prod.yml up -d
+# Start all services (including new ones) - MUST use --env-file
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
 
 # Check status
 docker-compose -f docker-compose.prod.yml ps
