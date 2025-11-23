@@ -12,7 +12,7 @@ import { LikesService } from '../api/services';
 const Tab = createBottomTabNavigator();
 
 const TabIcon = ({ focused, icon, label, badgeCount }: { focused: boolean, icon: string, label: string, badgeCount?: number }) => (
-    <View style={{ alignItems: 'center', justifyContent: 'center', top: 0 }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', top: 5 }}>
         <View style={{ position: 'relative' }}>
             <Text style={{
                 fontSize: 24,
@@ -71,11 +71,9 @@ export const MainTabNavigator = () => {
                 tabBarStyle: {
                     backgroundColor: COLORS.surface,
                     borderTopColor: COLORS.surfaceHighlight,
-                    height: 65,
-                    paddingBottom: 8,
-                    paddingTop: 8,
-                    position: 'absolute',
-                    bottom: 0,
+                    height: 70,
+                    paddingBottom: 10,
+                    paddingTop: 10,
                 },
                 tabBarShowLabel: false,
             }}
