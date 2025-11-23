@@ -98,10 +98,12 @@ ALTER TABLE media ADD COLUMN IF NOT EXISTS moderation_reason TEXT;
 ALTER TABLE media ADD COLUMN IF NOT EXISTS moderated_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE media ADD COLUMN IF NOT EXISTS moderation_scores JSONB; -- Store all scores
 ALTER TABLE media ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
+ALTER TABLE media ADD COLUMN IF NOT EXISTS batch_id UUID; -- For batch processing (1-9 photos per session)
 
--- Create index for fast pending queries
+-- Create indexes for fast queries
 CREATE INDEX IF NOT EXISTS idx_media_moderation_status ON media(moderation_status) 
 WHERE moderation_status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_media_batch_id ON media(batch_id); -- Fast batch updates
 
 -- Enum for status
 CREATE TYPE moderation_status_type AS ENUM ('pending', 'approved', 'rejected', 'failed');
@@ -110,17 +112,15 @@ CREATE TYPE moderation_status_type AS ENUM ('pending', 'approved', 'rejected', '
 **Moderation Scores JSONB Structure**:
 ```json
 {
-  "blur_score": 0.15,        // 0-1, lower = sharper
+  "blur_variance": 150,      // Laplacian variance, higher = sharper (threshold: 120)
   "has_face": true,
   "face_count": 1,
   "estimated_age": 25,
-  "nsfw_score": 0.02,        // 0-1, higher = more nsfw
-  "nsfw_categories": {
-    "porn": 0.01,
-    "sexy": 0.01,
+  "nsfw_scores": {
+    "porn": 0.01,            // Threshold: > 0.45 = reject
+    "sexy": 0.01,            // Threshold: > 0.7 = reject
     "hentai": 0.0
   },
-  "ocr_text": null,          // If screenshot detected
   "processing_time_ms": 1800
 }
 ```
@@ -131,15 +131,22 @@ CREATE TYPE moderation_status_type AS ENUM ('pending', 'approved', 'rejected', '
 
 **Queue Name**: `photo_moderation_queue`
 
-**Job Format** (JSON):
+**Job Format** (JSON) - **BATCH PROCESSING** (1-9 photos per job):
 ```json
 {
   "job_id": "uuid",
-  "media_id": "uuid",
+  "batch_id": "uuid",        // Same for all photos in one upload session
   "user_id": "uuid",
-  "r2_url": "https://...",
-  "r2_key": "users/xxx/photo/yyy.jpg",
-  "bucket": "lomi-photos",
+  "telegram_id": 123456789,   // For push notifications
+  "photos": [
+    {
+      "media_id": "uuid",
+      "r2_url": "https://...",
+      "r2_key": "users/xxx/photo/yyy.jpg",
+      "bucket": "lomi-photos"
+    },
+    // ... up to 9 photos
+  ],
   "created_at": "2025-01-20T10:00:00Z",
   "retry_count": 0,
   "priority": 1  // 1=normal, 2=high (retry)
@@ -155,11 +162,24 @@ CREATE TYPE moderation_status_type AS ENUM ('pending', 'approved', 'rejected', '
 ```json
 {
   "job_id": "uuid",
-  "media_id": "uuid",
+  "batch_id": "uuid",
   "user_id": "uuid",
-  "status": "approved|rejected|failed",
-  "reason": "blurry|no_face|underage|nsfw|screenshot",
-  "scores": {...},
+  "telegram_id": 123456789,
+  "results": [
+    {
+      "media_id": "uuid",
+      "status": "approved|rejected|failed",
+      "reason": "blurry|no_face|underage|nsfw",
+      "scores": {...}
+    },
+    // ... all photos in batch
+  ],
+  "summary": {
+    "total": 9,
+    "approved": 8,
+    "rejected": 1,
+    "reasons": {"blurry": 1}
+  },
   "processed_at": "2025-01-20T10:00:01Z"
 }
 ```
@@ -170,30 +190,36 @@ CREATE TYPE moderation_status_type AS ENUM ('pending', 'approved', 'rejected', '
 
 #### **A. New Handler: `POST /api/v1/media/upload-complete`**
 
-**Purpose**: Called after client uploads to R2, enqueues moderation job
+**Purpose**: Called after client uploads ALL photos to R2 (batch), enqueues ONE moderation job
 
-**Request**:
+**Request** (batch - 1-9 photos):
 ```json
 {
-  "file_key": "users/xxx/photo/yyy.jpg",
-  "media_type": "photo"
+  "photos": [
+    {
+      "file_key": "users/xxx/photo/yyy.jpg",
+      "media_type": "photo"
+    },
+    // ... up to 9 photos
+  ]
 }
 ```
 
 **Response** (immediate):
 ```json
 {
-  "media_id": "uuid",
-  "status": "pending",
-  "message": "We'll check your photos now"
+  "batch_id": "uuid",
+  "message": "We'll check your photos now",
+  "photos_count": 9
 }
 ```
 
 **Logic**:
-1. Create `media` record with `moderation_status='pending'`, `is_approved=false`
-2. Enqueue job to Redis queue
-3. Return 200 OK immediately (no waiting)
-4. Check rate limit: max 15 photos/user/hour
+1. **Rate Limit Check**: max 30 photos/user per 24 hours (not per hour)
+2. Generate `batch_id` (UUID) for this upload session
+3. Create all `media` records with `moderation_status='pending'`, `is_approved=false`, `batch_id`
+4. Enqueue **ONE job** to Redis queue (contains all photos in batch)
+5. Return 200 OK immediately (no waiting)
 
 #### **B. Redis Queue Manager** (`internal/queue/photo_moderation.go`)
 
@@ -204,20 +230,25 @@ CREATE TYPE moderation_status_type AS ENUM ('pending', 'approved', 'rejected', '
 
 #### **C. Redis Subscriber** (`internal/services/moderation_subscriber.go`)
 
-**Purpose**: Listen to `moderation_results` channel, update DB, send push
+**Purpose**: Listen to `moderation_results` channel, update DB, send **grouped smart push**
 
 **Logic**:
 1. Subscribe to `moderation_results` channel
-2. On message:
-   - Update `media` table: `moderation_status`, `moderation_reason`, `moderation_scores`
+2. On message (batch results):
+   - Update all `media` records in batch: `moderation_status`, `moderation_reason`, `moderation_scores`
    - If approved: Set `is_approved=true`
-   - If rejected: Keep `is_approved=false`, send rejection push
-   - If approved: Send "Your photos are live!" push
+   - **Rate limit pushes**: Max 1 push per user per 10 seconds (dedupe)
+   - **Smart grouped push**:
+     - All approved: "✅ All 9 photos are live!"
+     - Mixed: "✅ 8/9 photos approved, 1 was blurry"
+     - All rejected: "❌ Photos need to be clearer. Please upload again"
+3. Use `batch_id` for fast batch updates (single query)
 
 #### **D. Rate Limiting** (enhance existing)
 
 **Key**: `photo_upload_rate:{user_id}`
-**Limit**: 15 photos per hour
+**Limit**: 30 photos per 24 hours (better for onboarding)
+**Window**: 24 hours (86400 seconds)
 **Implementation**: Use existing Redis rate limit middleware
 
 ---
@@ -228,41 +259,43 @@ CREATE TYPE moderation_status_type AS ENUM ('pending', 'approved', 'rejected', '
 - **FastAPI** (lightweight, async) OR **Simple Python script** (simpler)
 - **OpenCV** (`cv2`) - Blur detection
 - **CompreFace REST API** - Face detection + age estimation
-- **Transformers** + **torch** - NSFW detection (Falconsai model)
-- **Tesseract OCR** (optional) - Screenshot detection
+- **Transformers** + **torch** - NSFW detection (**Qwen/Qwen2-VL-7B-Instruct** - #1 on HF leaderboard, better for dark skin & Habesha clothes)
 - **Redis** (`redis-py`) - Queue + Pub/Sub
 - **Requests** - HTTP calls to CompreFace, R2
+- **Note**: OCR/screenshot detection removed for MVP (adds latency, already caught by blur + no-face)
 
-#### **Worker Flow** (`worker/app.py`):
+#### **Worker Flow** (`worker/app.py`) - **BATCH PROCESSING**:
 
 ```python
 1. Connect to Redis
 2. Connect to CompreFace API
-3. Load NSFW model (once at startup)
+3. Load NSFW model (Qwen/Qwen2-VL-7B-Instruct) once at startup
 4. Loop forever:
    a. BRPOP from queue (blocking, 5s timeout)
-   b. Parse job JSON
-   c. Download image from R2 (presigned URL or direct)
-   d. Run checks in parallel:
-      - Blur detection (OpenCV Laplacian variance)
-      - Face detection (CompreFace API)
-      - NSFW detection (HF model)
-      - OCR (if needed)
-   e. Aggregate results
-   f. Determine status: approved/rejected/failed
-   g. Publish to Redis channel
-   h. If failed and retry_count < 2: Re-enqueue with retry_count++
+   b. Parse job JSON (contains batch of 1-9 photos)
+   c. Process all photos in batch:
+      For each photo:
+        - Download image from R2
+        - Run checks in parallel:
+          * Blur detection (OpenCV Laplacian variance)
+          * Face detection (CompreFace API)
+          * NSFW detection (Qwen model)
+        - Aggregate results
+        - Determine status: approved/rejected/failed
+   d. Create batch summary (total, approved, rejected, reasons)
+   e. Publish batch results to Redis channel (one message per batch)
+   f. If failed and retry_count < 2: Re-enqueue with retry_count++
 ```
 
-#### **Moderation Rules**:
+#### **Moderation Rules** (Relaxed for Ethiopian photos):
 
 | Check | Threshold | Action |
 |-------|-----------|--------|
-| Blur | variance < 100 | Reject: "blurry" |
+| Blur | variance < 120 | Reject: "blurry" (relaxed from 100) |
 | Face | no face detected | Reject: "no_face" |
 | Age | estimated_age < 18 | Reject: "underage" |
-| NSFW | porn > 0.5 OR sexy > 0.7 | Reject: "nsfw" |
-| OCR | text detected (screenshot) | Reject: "screenshot" |
+| NSFW | porn > 0.45 OR sexy > 0.7 | Reject: "nsfw" (relaxed porn threshold) |
+| **OCR** | **REMOVED** | **Not in MVP** (adds latency, caught by blur/no-face) |
 
 ---
 
@@ -311,14 +344,14 @@ services:
       timeout: 10s
       retries: 3
 
-  # NEW: Moderator Workers (6 replicas)
+  # NEW: Moderator Workers (4 replicas - scale with: docker compose up --scale moderator-worker=6)
   moderator-worker:
     build:
       context: ./moderator-worker
       dockerfile: Dockerfile
     restart: always
     deploy:
-      replicas: 6
+      replicas: 4  # Start with 4, scale to 6+ when needed
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -350,16 +383,22 @@ services:
 }
 ```
 
-**Rejection Messages** (Amharic + English):
+**Smart Grouped Push Messages** (Amharic + English):
 ```json
 {
-  "blurry": "ፎቶው ብዥ ነው! እንደገና ፍቀድ 😊\n\nPhoto is blurry! Please upload again 😊",
-  "no_face": "ፊትሽን/ፊቱን አሳይን!\n\nPlease show your face!",
-  "underage": "መታወቂያ ማረጋገጥ አለብህ (18+)\n\nAge verification required (18+)",
-  "nsfw": "ፎቶው ተገቢ አይደለም\n\nPhoto is not appropriate",
-  "screenshot": "Screenshots are not allowed"
+  "all_approved": "✅ ሁሉም ፎቶዎች ዝግጁ ናቸው!\n\nAll photos are live!",
+  "mixed": "✅ {approved}/{total} ፎቶዎች ዝግጁ ናቸው, {rejected} {reason}\n\n{approved}/{total} photos approved, {rejected} {reason}",
+  "all_rejected": "❌ ፎቶዎች የበለጠ ግልጽ መሆን አለባቸው. እንደገና ይጭኑ\n\nPhotos need to be clearer. Please upload again",
+  "reasons": {
+    "blurry": "ፎቶው ብዥ ነው!",
+    "no_face": "ፊትሽን/ፊቱን አሳይን!",
+    "underage": "መታወቂያ ማረጋገጥ አለብህ (18+)",
+    "nsfw": "ፎቶው ተገቢ አይደለም"
+  }
 }
 ```
+
+**Push Rate Limiting**: Max 1 push per user per 10 seconds (dedupe by user_id)
 
 ---
 
@@ -397,8 +436,8 @@ services:
 1. ✅ Error handling & logging
 2. ✅ Health checks
 3. ✅ Monitoring (queue length, worker status)
-4. ✅ Admin dashboard endpoint
-5. ✅ Load testing (500 concurrent uploads)
+4. ✅ Load testing (500 concurrent uploads)
+5. ⏸️ **Admin dashboard postponed** (add when we have 10k+ users)
 
 ---
 
@@ -409,9 +448,10 @@ services:
 | **User Response Time** | < 200ms | From upload-complete to 200 OK |
 | **Moderation Time** | < 1.8s | Per photo, 95th percentile |
 | **Queue Processing** | < 5s | Time from enqueue to worker start |
-| **Throughput** | 500+ photos/min | With 6 workers |
+| **Throughput** | 500+ photos/min | With 4 workers (scale to 6+ when needed) |
 | **Worker CPU** | < 70% | Per worker under load |
-| **Memory** | < 2GB/worker | Including models |
+| **Memory** | < 2GB/worker | Including Qwen model |
+| **Batch Processing** | < 3s | For 9 photos in one batch |
 
 ---
 
@@ -446,14 +486,21 @@ services:
 - **Redis**: 256MB RAM
 - **Go Backend**: 256MB RAM
 - **CompreFace**: 1GB RAM (face detection models)
-- **6 Workers**: 2GB RAM total (333MB each)
-- **Total**: ~4GB RAM (fits in 8GB VPS)
+- **4 Workers**: 1.5GB RAM total (375MB each) - Start with 4
+- **Total**: ~3.5GB RAM (fits in 4GB VPS, scales to 6 workers = ~4.5GB)
+
+### **Scaling Command**:
+```bash
+# Scale workers from 4 to 6 (or more) when needed
+docker compose -f docker-compose.prod.yml up -d --scale moderator-worker=6
+```
 
 ### **Optimizations**:
-1. **Model Loading**: Load NSFW model once at startup (shared memory)
+1. **Model Loading**: Load Qwen NSFW model once at startup (shared memory)
 2. **Image Caching**: Cache downloaded images in worker memory (LRU, 50MB)
-3. **Batch Processing**: Process multiple photos from same user together
-4. **Worker Scaling**: Start with 3 workers, scale to 6 if needed
+3. **Batch Processing**: Process all photos from one upload session together (1-9 photos = 1 job)
+4. **Worker Scaling**: Start with 4 workers, scale to 6+ with: `docker compose up --scale moderator-worker=6`
+5. **Push Deduplication**: Max 1 push per user per 10 seconds (prevents spam)
 
 ---
 
@@ -461,10 +508,12 @@ services:
 
 ✅ **User Experience**: Zero wait time - immediate 200 OK  
 ✅ **Throughput**: Handle 500+ simultaneous uploads  
-✅ **Accuracy**: < 1% false positives (rejecting good photos)  
-✅ **Speed**: < 2s average moderation time  
+✅ **Accuracy**: < 1% false positives (rejecting good photos) - relaxed thresholds help  
+✅ **Speed**: < 2s average moderation time per photo, < 3s for 9-photo batch  
 ✅ **Reliability**: 99.9% job completion rate  
-✅ **Cost**: Runs on $15/month VPS  
+✅ **Cost**: Runs on $15/month VPS (4 workers = 3.5GB RAM)  
+✅ **Batch Processing**: One job per upload session (1-9 photos)  
+✅ **Smart Notifications**: Grouped pushes, max 1 per 10 seconds  
 
 ---
 
@@ -473,6 +522,17 @@ services:
 1. **Review this roadmap** - Confirm architecture decisions
 2. **Start Phase 1** - Database + Queue foundation
 3. **Iterate** - Build, test, optimize
+
+## 🎯 Final Production Configuration
+
+- **Workers**: 4 (scale to 6+ with `docker compose up --scale moderator-worker=6`)
+- **NSFW Model**: Qwen/Qwen2-VL-7B-Instruct (better for dark skin & Habesha clothes)
+- **Rate Limit**: 30 photos per 24 hours (better for onboarding)
+- **Batch Processing**: 1 job per upload session (1-9 photos)
+- **Smart Pushes**: Grouped notifications, max 1 per 10 seconds
+- **Thresholds**: Relaxed (blur < 120, NSFW porn > 0.45)
+- **No OCR**: Removed for MVP (adds latency)
+- **No Admin Dashboard**: Postponed until 10k+ users
 
 **Ready to code?** Let me know and I'll start with Phase 1! 🚀
 
