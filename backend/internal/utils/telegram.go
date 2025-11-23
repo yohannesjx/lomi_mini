@@ -21,6 +21,7 @@ type TelegramUser struct {
 	Username     string `json:"username"`
 	LanguageCode string `json:"language_code"`
 	IsPremium    bool   `json:"is_premium"`
+	PhotoURL     string `json:"photo_url"`
 }
 
 // ValidateTelegramInitData validates the initData string from Telegram WebApp
@@ -42,7 +43,7 @@ func ValidateTelegramInitData(initData string, botToken string, expiresIn ...tim
 			if len(expiresIn) > 0 {
 				maxAge = expiresIn[0]
 			}
-			
+
 			if time.Since(authTime) > maxAge {
 				return nil, fmt.Errorf("initData expired (older than %v)", maxAge)
 			}
