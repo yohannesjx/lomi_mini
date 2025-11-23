@@ -187,6 +187,11 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 				fullName = "User" // Fallback if name is empty
 			}
 
+			// Initialize JSON fields
+			languages := models.JSONStringArray{}
+			interests := models.JSONStringArray{}
+			preferences := models.JSONMap{}
+
 			// Create user with minimal required fields for Telegram authentication
 			user = models.User{
 				TelegramID:        tgUser.ID,
@@ -203,13 +208,23 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 				VerificationStatus: models.VerificationPending,
 				IsActive:           true,
 				IsVerified:         false,
+				Languages:          languages,
+				Interests:          interests,
+				Preferences:        preferences,
+				CoinBalance:        0,
+				GiftBalance:        0.0,
 			}
 
 			if err := database.DB.Create(&user).Error; err != nil {
 				log.Printf("❌ Failed to create user: %v", err)
+				log.Printf("❌ User data: TelegramID=%d, Name=%s, Age=%d, Gender=%s, City=%s, Religion=%s",
+					user.TelegramID, user.Name, user.Age, user.Gender, user.City, user.Religion)
+				
+				// Return more detailed error for debugging
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"error":   "Could not create user",
 					"details": err.Error(),
+					"debug":   fmt.Sprintf("TelegramID: %d, Name: %s", user.TelegramID, user.Name),
 				})
 			}
 
