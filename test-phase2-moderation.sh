@@ -96,7 +96,8 @@ for i in $(seq 1 $NUM_PHOTOS); do
     fi
     
     # Upload to R2
-    UPLOAD_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X PUT "$UPLOAD_URL" \
+    UPLOAD_RESPONSE_FILE="/tmp/upload_response_$i.txt"
+    UPLOAD_STATUS=$(curl -s -o "$UPLOAD_RESPONSE_FILE" -w "%{http_code}" -X PUT "$UPLOAD_URL" \
         -H "Content-Type: image/jpeg" \
         --data-binary @"$TEMP_DIR/test_base.jpg")
     
@@ -109,8 +110,13 @@ for i in $(seq 1 $NUM_PHOTOS); do
         fi
         PHOTOS_JSON+="{\"file_key\":\"$FILE_KEY\",\"media_type\":\"photo\"}"
     else
+        UPLOAD_ERROR=$(cat "$UPLOAD_RESPONSE_FILE" 2>/dev/null || echo "")
         echo -e "    ${RED}❌ Upload failed with status: $UPLOAD_STATUS${NC}"
+        if [ -n "$UPLOAD_ERROR" ]; then
+            echo "    Error: $UPLOAD_ERROR"
+        fi
     fi
+    rm -f "$UPLOAD_RESPONSE_FILE"
     
     # Small delay to avoid rate limiting
     sleep 0.5
