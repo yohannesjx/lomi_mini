@@ -19,7 +19,8 @@ fi
 export $(cat .env.production | grep -v '^#' | xargs)
 
 echo "📦 Pulling latest code..."
-git pull origin main || git pull origin master
+git fetch origin
+git reset --hard origin/main || git reset --hard origin/master
 
 echo "🛑 Stopping old containers..."
 docker-compose -f docker-compose.prod.yml down

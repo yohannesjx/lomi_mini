@@ -12,7 +12,8 @@ sudo chown -R caddy:caddy /var/log/caddy 2>/dev/null || sudo chown -R www-data:w
 
 # Pull latest code
 echo "📥 Pulling latest code..."
-git pull origin main
+git fetch origin
+git reset --hard origin/main
 
 # Use simple Caddyfile (no log files, works without DNS)
 echo "📝 Using simple Caddyfile (works without DNS)..."
