@@ -3,7 +3,17 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { useOnboardingStore } from '../store/onboardingStore';
 import { useAuthStore } from '../store/authStore';
 import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
-import { View, StyleSheet, ToastAndroid, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
+
+// ToastAndroid is only available on Android
+let ToastAndroid: any = null;
+if (Platform.OS === 'android') {
+    try {
+        ToastAndroid = require('react-native').ToastAndroid;
+    } catch (e) {
+        // Not available
+    }
+}
 
 // Onboarding Screens
 import { ProfileSetupScreen } from '../screens/onboarding/ProfileSetupScreen';
