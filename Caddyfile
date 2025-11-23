@@ -28,11 +28,13 @@
         respond 204
     }
     
-    # Handle API requests
+    # Handle API requests (MUST come before static file serving)
     handle /api/* {
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
     
@@ -41,25 +43,23 @@
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
     
-    # Handle frontend
+    # Handle frontend (SPA - only for non-API routes)
     handle {
         root * /var/www/lomi-frontend
         try_files {path} /index.html
         file_server
     }
     
-    # CORS headers
+    # Global headers (applied to all responses)
     header {
         Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-    }
-    
-    # Security headers
-    header {
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         X-XSS-Protection "1; mode=block"
@@ -86,11 +86,13 @@ lomi.social, local.lomi {
         respond 204
     }
     
-    # Handle API requests (after OPTIONS)
+    # Handle API requests (MUST come before static file serving)
     handle /api/* {
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
     
@@ -99,25 +101,23 @@ lomi.social, local.lomi {
         reverse_proxy localhost:8080 {
             header_up Host {host}
             header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
         }
     }
     
-    # CORS headers for API
+    # Serve static files (SPA - only for non-API routes)
+    handle {
+        root * /var/www/lomi-frontend
+        try_files {path} /index.html
+        file_server
+    }
+    
+    # Global headers (applied to all responses)
     header {
         Access-Control-Allow-Origin "*"
         Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
         Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
-    }
-    
-    # Serve static files (if hosting frontend on server)
-    # Update this path to where your frontend build is located
-    root * /var/www/lomi-frontend
-    
-    # SPA fallback - serve index.html for all routes
-    try_files {path} /index.html
-    
-    # Security headers
-    header {
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         X-XSS-Protection "1; mode=block"
@@ -127,9 +127,6 @@ lomi.social, local.lomi {
     
     # Compression
     encode gzip zstd
-    
-    # File server
-    file_server
 }
 
 # Backend API (domain only - automatic HTTPS)
