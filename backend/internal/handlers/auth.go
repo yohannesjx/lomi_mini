@@ -94,24 +94,56 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 		})
 	}
 
+	// Check if bot token is configured
+	if h.cfg.TelegramBotToken == "" {
+		log.Printf("❌ TelegramBotToken is not configured")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Server configuration error",
+			"details": "Telegram bot token is not configured",
+		})
+	}
+
 	// 1. Validate Telegram Data using official library
 	// Consider initData valid for 1 hour from creation moment
-	err := initdata.Validate(initData, h.cfg.TelegramBotToken, time.Hour)
-	if err != nil {
-		log.Printf("❌ InitData validation failed: %v", err)
+	// Wrap in recover to catch any panics from the library
+	var validateErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("❌ Panic during initData validation: %v", r)
+				validateErr = fmt.Errorf("validation panic: %v", r)
+			}
+		}()
+		validateErr = initdata.Validate(initData, h.cfg.TelegramBotToken, time.Hour)
+	}()
+
+	if validateErr != nil {
+		log.Printf("❌ InitData validation failed: %v", validateErr)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error":   "Invalid Telegram data",
-			"details": err.Error(),
+			"details": validateErr.Error(),
 		})
 	}
 
 	// 2. Parse initData to get user information
-	parsedData, err := initdata.Parse(initData)
-	if err != nil {
-		log.Printf("❌ InitData parsing failed: %v", err)
+	// Wrap in recover to catch any panics from the library
+	var parsedData initdata.InitData
+	var parseErr error
+	func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("❌ Panic during initData parsing: %v", r)
+				parseErr = fmt.Errorf("parsing panic: %v", r)
+			}
+		}()
+		parsedData, parseErr = initdata.Parse(initData)
+	}()
+
+	if parseErr != nil {
+		log.Printf("❌ InitData parsing failed: %v", parseErr)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error":   "Failed to parse Telegram data",
-			"details": err.Error(),
+			"details": parseErr.Error(),
 		})
 	}
 
@@ -132,6 +164,15 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 		IsPremium:    parsedData.User.IsPremium,
 	}
 
+	// Check database connection
+	if database.DB == nil {
+		log.Printf("❌ Database connection is nil")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Database connection error",
+			"details": "Database is not connected",
+		})
+	}
+
 	// 3. Find or Create User
 	var user models.User
 	result := database.DB.Where("telegram_id = ?", tgUser.ID).First(&user)
@@ -149,10 +190,18 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 				// Other fields will be filled during onboarding
 			}
 			if err := database.DB.Create(&user).Error; err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Could not create user"})
+				log.Printf("❌ Failed to create user: %v", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error":   "Could not create user",
+					"details": err.Error(),
+				})
 			}
 		} else {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
+			log.Printf("❌ Database error: %v", result.Error)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   "Database error",
+				"details": result.Error.Error(),
+			})
 		}
 	} else {
 		// Update existing user info if changed
@@ -161,13 +210,28 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 			TelegramFirstName: tgUser.FirstName,
 			TelegramLastName:  tgUser.LastName,
 		}
-		database.DB.Model(&user).Updates(updates)
+		if err := database.DB.Model(&user).Updates(updates).Error; err != nil {
+			log.Printf("⚠️ Failed to update user info: %v", err)
+			// Don't fail the request, just log the warning
+		}
 	}
 
 	// 4. Generate JWT Tokens
+	if h.cfg.JWTSecret == "" {
+		log.Printf("❌ JWTSecret is not configured")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Server configuration error",
+			"details": "JWT secret is not configured",
+		})
+	}
+
 	tokens, err := utils.CreateToken(user.ID, h.cfg.JWTSecret)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Could not generate tokens"})
+		log.Printf("❌ Failed to generate tokens: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Could not generate tokens",
+			"details": err.Error(),
+		})
 	}
 
 	// 5. Return Response
