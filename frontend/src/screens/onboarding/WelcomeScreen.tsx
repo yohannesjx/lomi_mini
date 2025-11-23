@@ -93,7 +93,7 @@ export const WelcomeScreen = ({ navigation }: any) => {
                     `3. Telegram version too old\n` +
                     `4. Bot not properly configured\n\n` +
                     `Solutions:\n` +
-                    `1. Check BotFather: /myapps → Verify Web App URL is: https://lomi.social\n` +
+                    `1. Check BotFather: /myapps → Verify Web App URL is: https://lomi.social/ (trailing slash is OK)\n` +
                     `2. Make sure you open from Telegram bot menu (not browser)\n` +
                     `3. Update Telegram app\n` +
                     `4. Try closing and reopening the Mini App`;

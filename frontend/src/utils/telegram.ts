@@ -209,6 +209,11 @@ export const initializeTelegramWebApp = (options?: { enableFullscreen?: boolean 
     }
 };
 
+// Normalize URL by removing trailing slash for comparison
+const normalizeUrl = (url: string): string => {
+    return url.replace(/\/+$/, ''); // Remove trailing slashes
+};
+
 // Check if running in Telegram WebApp
 export const isTelegramWebApp = (): boolean => {
     if (typeof window === 'undefined') return false;
@@ -218,9 +223,18 @@ export const isTelegramWebApp = (): boolean => {
         return true;
     }
     
-    // Check URL parameters
-    if (window.location.search.includes('tgWebApp') || 
-        window.location.hash.includes('tgWebApp')) {
+    // Check URL parameters (handle both with and without trailing slash)
+    const url = normalizeUrl(window.location.href);
+    const search = window.location.search;
+    const hash = window.location.hash;
+    
+    if (search.includes('tgWebApp') || hash.includes('tgWebApp')) {
+        return true;
+    }
+    
+    // Check if URL matches Telegram Mini App pattern
+    // Telegram may add parameters to the URL
+    if (url.includes('tgWebApp') || search.includes('tgWebAppData')) {
         return true;
     }
     
@@ -229,7 +243,7 @@ export const isTelegramWebApp = (): boolean => {
     if (ua.includes('Telegram') || 
         ua.includes('TelegramBot') ||
         // Telegram iOS uses WebKit with specific patterns
-        (ua.includes('iPhone') && window.location.search.includes('tgWebApp'))) {
+        (ua.includes('iPhone') && (search.includes('tgWebApp') || hash.includes('tgWebApp')))) {
         return true;
     }
     
