@@ -694,7 +694,7 @@ export const SwipeScreen = () => {
     const filledLines = Math.min(Math.floor((currentIndex / Math.max(cards.length, 1)) * progressLines), progressLines);
 
     return (
-        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+        <SafeAreaView style={styles.container} edges={['top']}>
             {/* Top Navigation */}
             <View style={styles.topNav}>
                 {/* Filter/Sort Icons */}
@@ -885,8 +885,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: SPACING.m,
-        paddingVertical: SPACING.s,
+        paddingVertical: 0,
         gap: SPACING.m,
+        height: 50,
     },
     filterIcons: {
         flexDirection: 'row',
@@ -959,8 +960,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingBottom: 0,
-        paddingTop: SPACING.s,
+        paddingBottom: 10,
+        paddingTop: 0,
         paddingHorizontal: SPACING.l,
     },
     actionButton: {
