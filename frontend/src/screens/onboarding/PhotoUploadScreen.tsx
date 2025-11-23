@@ -207,20 +207,21 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
     };
 
     const handleNext = async () => {
-        // Require at least 2 photos
+        // Require at least 3 photos (as per requirements)
         const uploadedPhotos = photos.filter(p => p.fileKey !== null);
         const localPhotos = photos.filter(p => p.uri !== null && p.fileKey === null);
         
         // In dev mode, allow proceeding with local photos (not uploaded)
-        if (__DEV__ && uploadedPhotos.length === 0 && localPhotos.length >= 2) {
+        if (__DEV__ && uploadedPhotos.length === 0 && localPhotos.length >= 3) {
             console.warn('⚠️ Dev mode: Proceeding without uploading to R2');
             console.log('ℹ️  In production, photos will be uploaded to R2');
-            navigation.navigate('Interests');
+            await updateStep(5);
+            navigation.navigate('Video');
             return;
         }
         
-        if (uploadedPhotos.length < 2) {
-            Alert.alert('More Photos Needed', 'Please upload at least 2 photos to continue.');
+        if (uploadedPhotos.length < 3) {
+            Alert.alert('More Photos Needed', 'Please upload at least 3 photos to continue.');
             return;
         }
 

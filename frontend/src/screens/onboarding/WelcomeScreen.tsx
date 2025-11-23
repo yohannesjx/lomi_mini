@@ -113,10 +113,10 @@ export const WelcomeScreen = ({ navigation }: any) => {
         loadTokens().then(() => {
             const state = useAuthStore.getState();
             if (state.isAuthenticated && state.user) {
-                if (state.user.has_profile) {
+                if (state.user.onboarding_completed) {
                     navigation.navigate('Main');
                 } else {
-                    navigation.navigate('ProfileSetup');
+                    navigation.navigate('Onboarding');
                 }
             }
         });
@@ -165,11 +165,11 @@ export const WelcomeScreen = ({ navigation }: any) => {
                         // Clear URL hash
                         window.history.replaceState({}, document.title, window.location.pathname);
 
-                        // Navigate based on user profile
-                        if (user?.has_profile) {
+                        // Navigate based on onboarding status
+                        if (user?.onboarding_completed) {
                             navigation.navigate('Main');
                         } else {
-                            navigation.navigate('ProfileSetup');
+                            navigation.navigate('Onboarding');
                         }
                         return;
                     }
