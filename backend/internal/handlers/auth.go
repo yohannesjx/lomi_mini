@@ -111,8 +111,8 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 	}
 
 	// Extract user from parsed data
-	// parsedData.User is a pointer, check if it exists
-	if parsedData.User == nil {
+	// parsedData.User is a struct (not a pointer), check if ID is valid
+	if parsedData.User.ID == 0 {
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "User data missing in initData",
 		})
