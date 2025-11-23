@@ -214,7 +214,7 @@ echo ""
 echo "📊 Results for batch: $BATCH_ID"
 echo ""
 
-docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres psql -U "${DB_USER:-lomi}" -d "${DB_NAME:-lomi_db}" -c "
+docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres psql -U "${DB_USER:-lomi}" -d "${DB_NAME:-lomi_db}" <<EOF 2>/dev/null || echo "Failed to query database"
 SELECT 
     id,
     moderation_status,
@@ -222,13 +222,13 @@ SELECT
     moderated_at,
     CASE 
         WHEN moderation_scores IS NOT NULL THEN 
-            jsonb_pretty(moderation_scores)
-        ELSE '{}'::jsonb
+            moderation_scores::text
+        ELSE '{}'::text
     END as scores
 FROM media 
 WHERE batch_id = '$BATCH_ID'
 ORDER BY display_order;
-" 2>/dev/null || echo "Failed to query database"
+EOF
 
 echo ""
 echo "📈 Summary:"
