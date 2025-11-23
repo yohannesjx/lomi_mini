@@ -19,7 +19,7 @@ echo ""
 
 # Run migration
 echo "📤 Running migration..."
-docker exec -i lomi_postgres psql -U postgres -d lomi_db < backend/database/migrations/001_add_onboarding_fields.sql
+docker exec -i lomi_postgres psql -U lomi -d lomi_db < backend/database/migrations/001_add_onboarding_fields.sql
 
 if [ $? -eq 0 ]; then
     echo "✅ Migration completed successfully"
@@ -32,7 +32,7 @@ echo ""
 echo "🔍 Verifying migration..."
 
 # Verify columns exist
-docker exec -i lomi_postgres psql -U postgres -d lomi_db -c "
+docker exec -i lomi_postgres psql -U lomi -d lomi_db -c "
 SELECT column_name, data_type, column_default 
 FROM information_schema.columns 
 WHERE table_name = 'users' 
