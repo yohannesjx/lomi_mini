@@ -306,6 +306,22 @@ export const getTelegramDebugInfo = () => {
         info.hasInitDataUnsafe = !!webApp.initDataUnsafe;
         info.hasUser = !!webApp.initDataUnsafe?.user;
         
+        // Log all available WebApp properties for debugging
+        if (typeof webApp === 'object') {
+            info.availableProperties = Object.keys(webApp).slice(0, 20); // First 20 properties
+            info.totalProperties = Object.keys(webApp).length;
+        }
+        
+        // Check initDataUnsafe structure
+        if (webApp.initDataUnsafe) {
+            info.initDataUnsafeKeys = Object.keys(webApp.initDataUnsafe);
+            info.initDataUnsafeUser = webApp.initDataUnsafe.user ? {
+                id: webApp.initDataUnsafe.user.id,
+                first_name: webApp.initDataUnsafe.user.first_name,
+                username: webApp.initDataUnsafe.user.username,
+            } : null;
+        }
+        
         // Try to get from URL
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
@@ -315,6 +331,12 @@ export const getTelegramDebugInfo = () => {
             info.hashHasTgWebAppData = hash.includes('tgWebAppData');
         }
     }
+    
+    // Determine if actually in Telegram browser
+    info.isInTelegramBrowser = info.platform !== 'unknown' && 
+                               (info.platform === 'ios' || 
+                                info.platform === 'android' || 
+                                info.platform === 'tdesktop');
     
     return info;
 };

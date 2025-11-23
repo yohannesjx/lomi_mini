@@ -48,17 +48,41 @@ export const WelcomeScreen = ({ navigation }: any) => {
             const inTelegram = isTelegramWebApp();
             console.log('📍 In Telegram WebApp:', inTelegram);
             
-            if (!inTelegram) {
-                const errorMsg = `❌ App is not opened from Telegram!\n\n` +
-                    `Current: Opened in ${debugInfo.userAgent.includes('Safari') ? 'Safari browser' : 'regular browser'}\n\n` +
-                    `To fix:\n` +
-                    `1. Open Telegram app\n` +
-                    `2. Find your bot\n` +
-                    `3. Click menu button (☰)\n` +
-                    `4. Select Mini App from menu\n\n` +
-                    `Do NOT open the URL directly in a browser!`;
+            // Critical check: platform should NOT be 'unknown' if opened from Telegram
+            const isInTelegramBrowser = debugInfo.platform !== 'unknown' && 
+                                       (debugInfo.platform === 'ios' || 
+                                        debugInfo.platform === 'android' || 
+                                        debugInfo.platform === 'tdesktop' ||
+                                        debugInfo.platform === 'web' ||
+                                        debugInfo.platform === 'macos');
+            
+            console.log('🔍 Platform check:', {
+                platform: debugInfo.platform,
+                isInTelegramBrowser,
+                userAgent: debugInfo.userAgent.substring(0, 100),
+            });
+            
+            if (!isInTelegramBrowser || debugInfo.platform === 'unknown') {
+                const errorMsg = `❌ App is NOT opened from Telegram's in-app browser!\n\n` +
+                    `Current Status:\n` +
+                    `- Platform: ${debugInfo.platform} (should be 'ios' or 'android')\n` +
+                    `- Browser: ${debugInfo.userAgent.includes('Safari') && !debugInfo.userAgent.includes('Telegram') ? 'Safari (WRONG!)' : 'Unknown'}\n` +
+                    `- WebApp exists: ${debugInfo.webAppExists}\n` +
+                    `- Has initData: ${debugInfo.hasInitData}\n\n` +
+                    `✅ CORRECT Way to Open:\n` +
+                    `1. Open TELEGRAM APP (not Safari)\n` +
+                    `2. Search for your bot\n` +
+                    `3. Open the bot\n` +
+                    `4. Tap menu button (☰) at bottom\n` +
+                    `5. Tap Mini App from menu\n\n` +
+                    `❌ WRONG: Do NOT:\n` +
+                    `- Type URL in Safari\n` +
+                    `- Open from browser bookmark\n` +
+                    `- Share link and open in browser\n\n` +
+                    `The app MUST be opened from Telegram's in-app browser to work!`;
                 
-                console.error(errorMsg);
+                console.error('❌', errorMsg);
+                console.error('Full debug:', JSON.stringify(debugInfo, null, 2));
                 alert(errorMsg);
                 return;
             }
