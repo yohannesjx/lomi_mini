@@ -146,7 +146,7 @@ def check_face_and_age(image_bytes: bytes) -> dict:
 
 
 def check_nsfw(image_bytes: bytes) -> dict:
-    """Check for NSFW content using FalAI NSFW detection model"""
+    """Check for NSFW content using Falconsai NSFW detection model"""
     if nsfw_model is None or nsfw_processor is None:
         logger.warning("NSFW model not loaded, skipping NSFW check")
         return {
