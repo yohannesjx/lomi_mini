@@ -1,15 +1,120 @@
+# Caddyfile for Lomi Social
+# Server IP: 152.53.87.200
+
+# HTTP-only block for IP address (no SSL)
 :80 {
-    reverse_proxy /api/* localhost:8080
-    reverse_proxy /ws localhost:8080
-    root * /var/www/lomi-frontend
-    try_files {path} /index.html
-    file_server
+    # Handle preflight OPTIONS requests FIRST
+    @options {
+        method OPTIONS
+        path /api/*
+    }
+    handle @options {
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+            Access-Control-Max-Age "3600"
+        }
+        respond 204
+    }
+    
+    # Handle API requests (MUST come before static file serving)
+    handle /api/* {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Handle WebSocket
+    handle /ws {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Serve static files (SPA - only for non-API routes)
+    handle {
+        root * /var/www/lomi-frontend
+        try_files {path} /index.html
+        file_server
+    }
+    
+    # Global headers
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+    }
+    
+    # Compression
+    encode gzip zstd
 }
 
-lomi.social {
-    reverse_proxy /api/* localhost:8080
-    reverse_proxy /ws localhost:8080
-    root * /var/www/lomi-frontend
-    try_files {path} /index.html
-    file_server
+# Domain-based block (automatic HTTPS/SSL)
+lomi.social, local.lomi {
+    # Handle preflight OPTIONS requests FIRST
+    @options {
+        method OPTIONS
+        path /api/*
+    }
+    handle @options {
+        header {
+            Access-Control-Allow-Origin "*"
+            Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+            Access-Control-Max-Age "3600"
+        }
+        respond 204
+    }
+    
+    # Handle API requests (MUST come before static file serving)
+    handle /api/* {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Handle WebSocket
+    handle /ws {
+        reverse_proxy localhost:8080 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+    
+    # Serve static files (SPA - only for non-API routes)
+    handle {
+        root * /var/www/lomi-frontend
+        try_files {path} /index.html
+        file_server
+    }
+    
+    # Global headers
+    header {
+        Access-Control-Allow-Origin "*"
+        Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+        Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    }
+    
+    # Compression
+    encode gzip zstd
 }
