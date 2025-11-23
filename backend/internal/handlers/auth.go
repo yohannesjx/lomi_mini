@@ -200,12 +200,31 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 			}
 			if err := database.DB.Create(&user).Error; err != nil {
 				log.Printf("❌ Failed to create user: %v", err)
+				log.Printf("❌ Error type: %T", err)
 				log.Printf("❌ User data: TelegramID=%d, Name=%s, Age=%d, Gender=%s, City=%s", 
 					user.TelegramID, user.Name, user.Age, user.Gender, user.City)
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error":   "Could not create user",
-					"details": err.Error(),
-				})
+				
+				// Check for specific database errors
+				if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "UNIQUE constraint") {
+					log.Printf("⚠️  User with TelegramID %d already exists, trying to find...", tgUser.ID)
+					// Try to find existing user
+					if findErr := database.DB.Where("telegram_id = ?", tgUser.ID).First(&user).Error; findErr == nil {
+						log.Printf("✅ Found existing user, continuing with login...")
+						// Continue with existing user
+					} else {
+						return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+							"error":   "Could not create or find user",
+							"details": err.Error(),
+						})
+					}
+				} else {
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"error":   "Could not create user",
+						"details": err.Error(),
+					})
+				}
+			} else {
+				log.Printf("✅ Created new user: ID=%s, TelegramID=%d", user.ID, user.TelegramID)
 			}
 			log.Printf("✅ Created new user: ID=%s, TelegramID=%d", user.ID, user.TelegramID)
 		} else {
@@ -451,14 +470,32 @@ func (h *AuthHandler) TelegramWidgetLogin(c *fiber.Ctx) error {
 			}
 			if err := database.DB.Create(&user).Error; err != nil {
 				log.Printf("❌ Failed to create user (widget): %v", err)
+				log.Printf("❌ Error type: %T", err)
 				log.Printf("❌ User data: TelegramID=%d, Name=%s, Age=%d, Gender=%s, City=%s", 
 					user.TelegramID, user.Name, user.Age, user.Gender, user.City)
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error":   "Could not create user",
-					"details": err.Error(),
-				})
+				
+				// Check for specific database errors
+				if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "UNIQUE constraint") {
+					log.Printf("⚠️  User with TelegramID %d already exists, trying to find...", tgUser.ID)
+					// Try to find existing user
+					if findErr := database.DB.Where("telegram_id = ?", tgUser.ID).First(&user).Error; findErr == nil {
+						log.Printf("✅ Found existing user, continuing with login...")
+						// Continue with existing user
+					} else {
+						return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+							"error":   "Could not create or find user",
+							"details": err.Error(),
+						})
+					}
+				} else {
+					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+						"error":   "Could not create user",
+						"details": err.Error(),
+					})
+				}
+			} else {
+				log.Printf("✅ Created new user (widget): ID=%s, TelegramID=%d", user.ID, user.TelegramID)
 			}
-			log.Printf("✅ Created new user (widget): ID=%s, TelegramID=%d", user.ID, user.TelegramID)
 		} else {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})
 		}
