@@ -2,8 +2,8 @@
 # Use this if DNS isn't configured yet
 # Server IP: 152.53.87.200
 
-# Serve on IP address (temporary until DNS is ready)
-:80 {
+# Serve on IP address and local.lomi (temporary until DNS is ready)
+:80, local.lomi {
     # Handle API requests
     handle /api/* {
         reverse_proxy localhost:8080 {
@@ -47,9 +47,10 @@
     
     encode gzip zstd
     
-    log {
-        output file /var/log/caddy/app.log
-        format json
-    }
+    # Logging disabled to avoid permission issues
+    # log {
+    #     output file /var/log/caddy/app.log
+    #     format json
+    # }
 }
 
