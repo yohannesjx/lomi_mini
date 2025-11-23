@@ -27,23 +27,29 @@ const getApiUrl = () => {
     }
     
     // Production URL (for deployed app or when opened from Telegram)
-    // Try domain first, fallback to IP if domain doesn't resolve
-    const apiDomain = 'https://api.lomi.social/api/v1';
-    const apiIP = 'http://152.53.87.200/api/v1'; // Fallback to IP
-    
-    // If we're on the same domain (lomi.social), use relative path for API
     if (typeof window !== 'undefined') {
         const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
         
-        // If on lomi.social, try api.lomi.social first, then fallback to IP
-        if (hostname === 'lomi.social' || hostname === '152.53.87.200') {
-            // Use domain if available, otherwise IP
-            // For now, use IP as fallback since DNS might not be configured
-            return apiIP;
+        // If on lomi.social or IP, use relative path (Caddy handles /api/* routing)
+        if (hostname === 'lomi.social' || hostname === '152.53.87.200' || hostname.includes('lomi.social')) {
+            // Use relative path - Caddy will route /api/* to backend
+            return '/api/v1';
+        }
+        
+        // If on api.lomi.social, use current origin
+        if (hostname === 'api.lomi.social' || hostname.includes('api.lomi.social')) {
+            return `${protocol}//${hostname}/api/v1`;
         }
     }
     
-    return apiDomain;
+    // Fallback: Try domain first, then IP
+    // Check if we can use HTTPS (if DNS is configured)
+    const apiDomain = 'https://api.lomi.social/api/v1';
+    const apiIP = 'http://152.53.87.200/api/v1';
+    
+    // For now, use IP as fallback since DNS might not be configured
+    return apiIP;
 };
 
 const API_BASE_URL = getApiUrl();
