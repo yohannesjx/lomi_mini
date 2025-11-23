@@ -8,9 +8,22 @@ set -e
 echo "🚀 Deploying Frontend from Server..."
 
 FRONTEND_DIR="/var/www/lomi-frontend"
-PROJECT_DIR="${PROJECT_DIR:-~/lomi_mini}"
+
+# Find project directory (try common locations)
+if [ -d "/opt/lomi_mini/frontend" ]; then
+    PROJECT_DIR="/opt/lomi_mini"
+elif [ -d "~/lomi_mini/frontend" ]; then
+    PROJECT_DIR="~/lomi_mini"
+elif [ -d "./frontend" ]; then
+    PROJECT_DIR="."
+else
+    echo "❌ Error: Could not find frontend directory"
+    echo "Please run this script from the project root or set PROJECT_DIR"
+    exit 1
+fi
 
 cd "$PROJECT_DIR/frontend"
+echo "📁 Using project directory: $PROJECT_DIR"
 
 # Check if dist directory exists
 if [ ! -d "dist" ]; then
