@@ -34,30 +34,66 @@ export const WelcomeScreen = ({ navigation }: any) => {
 
     const handleLogin = async () => {
         try {
-            const initData = getTelegramInitData();
+            // Wait a bit for Telegram WebApp to fully initialize
+            const webApp = getTelegramWebApp();
             
-            if (!initData) {
-                // Telegram WebApp is only available when opened from Telegram
-                // This requires a publicly accessible HTTPS URL
-                if (__DEV__) {
-                    console.warn('⚠️ Telegram WebApp not available in local development.');
-                    console.log('ℹ️  This is expected. Telegram auth only works when:');
-                    console.log('   1. App is deployed to a public HTTPS URL');
-                    console.log('   2. App is opened from within Telegram');
-                    console.log('   3. Mini App is configured in BotFather');
-                    console.log('');
-                    console.log('💡 For now, you can test the UI flow without authentication.');
-                    
-                    // Auto-navigate to profile setup in dev mode
-                    // This allows testing the UI without Telegram
-                    navigation.navigate('ProfileSetup');
-                    return;
-                } else {
-                    // In production, require Telegram
-                    throw new Error('Telegram WebApp is required. Please open this app from Telegram.');
-                }
+            // Debug logging
+            console.log('🔍 Telegram WebApp check:', {
+                exists: !!webApp,
+                initData: webApp?.initData ? 'present' : 'missing',
+                initDataLength: webApp?.initData?.length || 0,
+                platform: webApp?.platform,
+                version: webApp?.version,
+            });
+            
+            // Try to get initData with retry
+            let initData = getTelegramInitData();
+            
+            // If not available, wait a bit and try again (Telegram might still be loading)
+            if (!initData && webApp) {
+                console.log('⏳ Waiting for Telegram initData...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                initData = getTelegramInitData();
             }
             
+            if (!initData) {
+                // Check if we're actually in Telegram
+                const isInTelegram = webApp !== null || 
+                    (typeof window !== 'undefined' && 
+                     (window.location.search.includes('tgWebApp') || 
+                      navigator.userAgent.includes('Telegram')));
+                
+                if (!isInTelegram) {
+                    const errorMsg = 'Please open this app from Telegram. Go to your bot and click the menu button, then select the Mini App.';
+                    console.error('❌', errorMsg);
+                    
+                    // Use showConfirm instead of showAlert (more compatible)
+                    if (webApp && typeof webApp.showConfirm === 'function') {
+                        webApp.showConfirm(errorMsg, (confirmed) => {
+                            if (confirmed) {
+                                // User confirmed, but we still can't proceed
+                                console.log('User acknowledged error');
+                            }
+                        });
+                    } else {
+                        alert(errorMsg);
+                    }
+                    return;
+                }
+                
+                // We're in Telegram but initData is missing
+                const errorMsg = 'Telegram authentication data is missing. Please try closing and reopening the app.';
+                console.error('❌', errorMsg);
+                
+                if (webApp && typeof webApp.showConfirm === 'function') {
+                    webApp.showConfirm(errorMsg);
+                } else {
+                    alert(errorMsg);
+                }
+                return;
+            }
+            
+            console.log('✅ InitData found, attempting login...');
             await login(initData);
             
             // Check if user has completed profile
@@ -70,12 +106,21 @@ export const WelcomeScreen = ({ navigation }: any) => {
         } catch (error: any) {
             console.error('Login error:', error);
             
-            // Show error message
+            // Show error message (use showConfirm instead of showAlert for compatibility)
             const webApp = getTelegramWebApp();
+            const errorMsg = error?.message || 'Login failed. Please try again.';
+            
             if (webApp) {
-                webApp.showAlert(error?.message || 'Login failed. Please try again.');
+                // Try showConfirm first (more compatible)
+                if (typeof webApp.showConfirm === 'function') {
+                    webApp.showConfirm(errorMsg);
+                } else if (typeof webApp.showAlert === 'function') {
+                    webApp.showAlert(errorMsg);
+                } else {
+                    alert(errorMsg);
+                }
             } else {
-                alert(error?.message || 'Login failed. Please try again.');
+                alert(errorMsg);
             }
         }
     };

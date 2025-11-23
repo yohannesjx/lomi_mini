@@ -90,7 +90,8 @@ declare global {
                 openLink: (url: string, options?: { try_instant_view?: boolean }) => void;
                 openTelegramLink: (url: string) => void;
                 openInvoice: (url: string, callback?: (status: string) => void) => void;
-                showPopup: (params: {
+                // Note: showPopup may not be available in all Telegram WebApp versions
+                showPopup?: (params: {
                     title?: string;
                     message: string;
                     buttons?: Array<{
@@ -99,7 +100,7 @@ declare global {
                         text?: string;
                     }>;
                 }, callback?: (id: string) => void) => void;
-                showAlert: (message: string, callback?: () => void) => void;
+                showAlert?: (message: string, callback?: () => void) => void;
                 showConfirm: (message: string, callback?: (confirmed: boolean) => void) => void;
                 showScanQrPopup: (params: {
                     text?: string;
@@ -126,8 +127,20 @@ export const getTelegramWebApp = () => {
 
 export const getTelegramInitData = (): string | null => {
     const webApp = getTelegramWebApp();
-    if (webApp?.initData) {
-        return webApp.initData;
+    
+    // Check if WebApp exists and has initData
+    if (webApp) {
+        // initData might be available directly
+        if (webApp.initData && webApp.initData.length > 0) {
+            return webApp.initData;
+        }
+        
+        // Sometimes initData is in initDataUnsafe
+        // Try to reconstruct from user data if available
+        if (webApp.initDataUnsafe?.user) {
+            // Note: This is a fallback - actual initData is preferred
+            console.warn('⚠️ Using initDataUnsafe - this may not work for authentication');
+        }
     }
     
     // Fallback: Try to get from window.location for web platform
@@ -136,6 +149,15 @@ export const getTelegramInitData = (): string | null => {
         const tgWebAppData = params.get('tgWebAppData');
         if (tgWebAppData) {
             return decodeURIComponent(tgWebAppData);
+        }
+        
+        // Also check hash
+        const hash = window.location.hash;
+        if (hash.includes('tgWebAppData=')) {
+            const match = hash.match(/tgWebAppData=([^&]+)/);
+            if (match) {
+                return decodeURIComponent(match[1]);
+            }
         }
     }
     
