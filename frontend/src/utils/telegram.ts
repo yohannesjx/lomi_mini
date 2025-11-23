@@ -157,13 +157,56 @@ export const getTelegramInitData = (): string | null => {
         }
         
         console.log('⚠️ webApp.initData is empty, checking other sources...');
-        console.log('WebApp object keys:', Object.keys(webApp));
-        console.log('WebApp initDataUnsafe:', webApp.initDataUnsafe);
     }
     
-    // Try to get from window object (Telegram might store it globally)
+    // Try to get from window object and URL (Telegram passes it in URL parameters)
     if (typeof window !== 'undefined') {
         const windowAny = window as any;
+        const location = window.location;
+        const fullUrl = location.href;
+        
+        // Telegram passes initData in URL as a query parameter
+        // Format: ?tgWebAppData=... or #tgWebAppData=...
+        
+        // Check all possible URL patterns
+        const patterns = [
+            /[?&#]tgWebAppData=([^&]+)/,
+            /[?&#]tgWebAppStartParam=([^&]+)/,
+            /[?&#]_tgWebAppData=([^&]+)/,
+            /[?&#]initData=([^&]+)/,
+        ];
+        
+        for (const pattern of patterns) {
+            const match = fullUrl.match(pattern);
+            if (match) {
+                const data = decodeURIComponent(match[1]);
+                if (data && data.length > 0) {
+                    console.log(`✅ Found initData in URL with pattern: ${pattern}`);
+                    return data;
+                }
+            }
+        }
+        
+        // Check query parameters directly
+        const params = new URLSearchParams(location.search);
+        for (const [key, value] of params.entries()) {
+            if (key.toLowerCase().includes('tgwebapp') || key.toLowerCase().includes('initdata')) {
+                console.log(`✅ Found initData in query param: ${key}`);
+                return decodeURIComponent(value);
+            }
+        }
+        
+        // Check hash
+        const hash = location.hash;
+        if (hash) {
+            const hashParams = new URLSearchParams(hash.substring(1));
+            for (const [key, value] of hashParams.entries()) {
+                if (key.toLowerCase().includes('tgwebapp') || key.toLowerCase().includes('initdata')) {
+                    console.log(`✅ Found initData in hash param: ${key}`);
+                    return decodeURIComponent(value);
+                }
+            }
+        }
         
         // Check if Telegram stores initData in window
         if (windowAny.tgWebAppData) {
@@ -171,47 +214,24 @@ export const getTelegramInitData = (): string | null => {
             return windowAny.tgWebAppData;
         }
         
-        // Check window.location (Telegram passes it in URL)
-        const location = window.location;
-        
-        // Check query parameters
-        const params = new URLSearchParams(location.search);
-        const tgWebAppData = params.get('tgWebAppData');
-        if (tgWebAppData) {
-            console.log('✅ Found initData in URL query params');
-            return decodeURIComponent(tgWebAppData);
-        }
-        
-        // Check hash
-        const hash = location.hash;
-        if (hash.includes('tgWebAppData=')) {
-            const match = hash.match(/tgWebAppData=([^&]+)/);
-            if (match) {
-                console.log('✅ Found initData in URL hash');
-                return decodeURIComponent(match[1]);
+        // Check document.referrer
+        if (document.referrer) {
+            for (const pattern of patterns) {
+                const match = document.referrer.match(pattern);
+                if (match) {
+                    console.log(`✅ Found initData in document.referrer`);
+                    return decodeURIComponent(match[1]);
+                }
             }
         }
         
-        // Try to get from window.location.href (full URL)
-        const fullUrl = location.href;
-        const urlMatch = fullUrl.match(/[?&#]tgWebAppData=([^&]+)/);
-        if (urlMatch) {
-            console.log('✅ Found initData in full URL');
-            return decodeURIComponent(urlMatch[1]);
-        }
-        
-        // Check document.referrer (might have Telegram data)
-        if (document.referrer && document.referrer.includes('tgWebAppData')) {
-            const referrerMatch = document.referrer.match(/tgWebAppData=([^&]+)/);
-            if (referrerMatch) {
-                console.log('✅ Found initData in document.referrer');
-                return decodeURIComponent(referrerMatch[1]);
-            }
-        }
+        // Log full URL for debugging
+        console.log('🔍 Full URL being checked:', fullUrl);
+        console.log('🔍 Search params:', location.search);
+        console.log('🔍 Hash:', location.hash);
     }
     
     console.warn('❌ initData not found in any source');
-    console.warn('Available WebApp properties:', webApp ? Object.keys(webApp) : 'WebApp not found');
     return null;
 };
 

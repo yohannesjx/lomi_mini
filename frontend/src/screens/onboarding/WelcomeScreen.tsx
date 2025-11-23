@@ -64,41 +64,50 @@ export const WelcomeScreen = ({ navigation }: any) => {
             const inTelegram = isTelegramWebApp();
             console.log('📍 In Telegram WebApp:', inTelegram);
             
-            // Critical check: platform should NOT be 'unknown' if opened from Telegram
-            const isInTelegramBrowser = debugInfo.platform !== 'unknown' && 
-                                       (debugInfo.platform === 'ios' || 
-                                        debugInfo.platform === 'android' || 
-                                        debugInfo.platform === 'tdesktop' ||
-                                        debugInfo.platform === 'web' ||
-                                        debugInfo.platform === 'macos');
+            // Check if we're in Telegram browser
+            // Note: platform can be 'unknown' in some cases even when in Telegram
+            // So we check multiple indicators
+            const isInTelegramBrowser = (
+                debugInfo.platform !== 'unknown' && 
+                (debugInfo.platform === 'ios' || 
+                 debugInfo.platform === 'android' || 
+                 debugInfo.platform === 'tdesktop' ||
+                 debugInfo.platform === 'web' ||
+                 debugInfo.platform === 'macos')
+            ) || (
+                // Even if platform is unknown, check other indicators
+                debugInfo.webAppExists && 
+                (debugInfo.url.includes('tgWebApp') || 
+                 debugInfo.search.includes('tgWebApp') ||
+                 debugInfo.hash.includes('tgWebApp') ||
+                 debugInfo.userAgent.includes('Telegram'))
+            );
             
             console.log('🔍 Platform check:', {
                 platform: debugInfo.platform,
                 isInTelegramBrowser,
                 userAgent: debugInfo.userAgent.substring(0, 100),
+                url: debugInfo.url,
+                hasTgWebAppInUrl: debugInfo.url.includes('tgWebApp'),
             });
             
-            if (!isInTelegramBrowser || debugInfo.platform === 'unknown') {
+            // Only show error if we're definitely NOT in Telegram
+            // If platform is unknown but WebApp exists, we might still be in Telegram
+            if (!isInTelegramBrowser && debugInfo.platform === 'unknown' && !debugInfo.webAppExists) {
                 const errorMsg = `❌ App is NOT opened from Telegram's in-app browser!\n\n` +
                     `Current Status:\n` +
-                    `- Platform: ${debugInfo.platform} (should be 'ios' or 'android')\n` +
+                    `- Platform: ${debugInfo.platform}\n` +
                     `- Browser: ${debugInfo.userAgent.includes('Safari') && !debugInfo.userAgent.includes('Telegram') ? 'Safari (WRONG!)' : 'Unknown'}\n` +
-                    `- WebApp exists: ${debugInfo.webAppExists}\n` +
-                    `- Has initData: ${debugInfo.hasInitData}\n\n` +
+                    `- WebApp exists: ${debugInfo.webAppExists}\n\n` +
                     `✅ CORRECT Way to Open:\n` +
                     `1. Open TELEGRAM APP (not Safari)\n` +
                     `2. Search for your bot\n` +
                     `3. Open the bot\n` +
                     `4. Tap menu button (☰) at bottom\n` +
                     `5. Tap Mini App from menu\n\n` +
-                    `❌ WRONG: Do NOT:\n` +
-                    `- Type URL in Safari\n` +
-                    `- Open from browser bookmark\n` +
-                    `- Share link and open in browser\n\n` +
-                    `The app MUST be opened from Telegram's in-app browser to work!`;
+                    `The app MUST be opened from Telegram's in-app browser!`;
                 
                 console.error('❌', errorMsg);
-                console.error('Full debug:', JSON.stringify(debugInfo, null, 2));
                 alert(errorMsg);
                 return;
             }
