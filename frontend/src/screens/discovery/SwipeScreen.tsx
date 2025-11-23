@@ -965,7 +965,7 @@ const styles = StyleSheet.create({
     },
     actionsContainer: {
         position: 'absolute',
-        bottom: 65, // Moved down by 10px
+        bottom: 50, // Moved down by 15px
         left: 20,
         right: 20,
         flexDirection: 'row',
