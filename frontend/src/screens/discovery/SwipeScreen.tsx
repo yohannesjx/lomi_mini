@@ -965,7 +965,7 @@ const styles = StyleSheet.create({
     },
     actionsContainer: {
         position: 'absolute',
-        bottom: 75, // Moved down closer to nav bar
+        bottom: 65, // Moved down by 10px
         left: 20,
         right: 20,
         flexDirection: 'row',
