@@ -46,6 +46,16 @@ export const AuthGuard: React.FC<{
 
             // Step 1.5: Check if we're handling a Telegram Widget OAuth callback
             if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                // Check for tokens in hash (redirect from backend after widget auth)
+                const hash = window.location.hash;
+                if (hash.includes('access_token=')) {
+                    console.log('🔐 Detected widget redirect with tokens');
+                    // Handle widget callback - will be handled by WelcomeScreen
+                    setIsCheckingAuth(false);
+                    return;
+                }
+
+                // Check for widget auth data in query params
                 const urlParams = new URLSearchParams(window.location.search);
                 if (urlParams.has('id') && urlParams.has('hash') && urlParams.has('auth_date')) {
                     console.log('🔐 Detected Telegram Widget OAuth callback');
@@ -55,13 +65,7 @@ export const AuthGuard: React.FC<{
                 }
             }
 
-            if (!inTelegram) {
-                console.log('⚠️ App not opened in Telegram - showing web login option');
-                setIsCheckingAuth(false);
-                return; // Show welcome screen with web login button
-            }
-
-            // Step 2: Load existing tokens (if any)
+            // Step 2: Load existing tokens (if any) - don't auto-authenticate
             await loadTokens();
 
             // Step 3: If already authenticated, check if onboarding is needed
@@ -73,30 +77,13 @@ export const AuthGuard: React.FC<{
                 return;
             }
 
-            // Step 4: Get initData from Telegram
-            console.log('🔐 Starting automatic authentication...');
-            const initData = await waitForInitData();
-
-            if (!initData) {
-                throw new Error('initData not available. Please open the app from Telegram.');
-            }
-
-            // Step 5: Authenticate with backend
-            console.log('📤 Sending initData to backend...');
-            await login(initData);
-
-            // Step 6: Get updated user from store
-            const updatedUser = useAuthStore.getState().user;
-            if (!updatedUser) {
-                throw new Error('Authentication failed: No user data received');
-            }
-
-            console.log('✅ Authentication successful');
-            handlePostAuthRouting();
+            // Don't auto-authenticate - let user click the button
+            // This allows the landing page to show first
+            console.log('ℹ️ Landing page mode - waiting for user to click login button');
+            setIsCheckingAuth(false);
         } catch (error: any) {
-            console.error('❌ Authentication error:', error);
+            console.error('❌ Auth initialization error:', error);
             setAuthError(error?.response?.data?.error || error?.message || 'Authentication failed');
-        } finally {
             setIsCheckingAuth(false);
         }
     };
@@ -179,21 +166,22 @@ export const AuthGuard: React.FC<{
         }
     };
 
-    // Show loading screen while checking authentication (only if in Telegram)
-    if ((isCheckingAuth || isLoading) && isInTelegram === true) {
+    // Show loading screen only if we're checking existing auth (not blocking)
+    // Only show if we're actually loading tokens, not if we're just waiting for user action
+    if (isCheckingAuth && isLoading) {
         return (
             <View style={styles.container}>
                 <View style={styles.loadingContent}>
                     <ActivityIndicator size="large" color={COLORS.primary} />
-                    <Text style={styles.loadingText}>Authenticating...</Text>
+                    <Text style={styles.loadingText}>Loading...</Text>
                     <Text style={styles.loadingSubtext}>Please wait</Text>
                 </View>
             </View>
         );
     }
 
-    // Don't block web browsers - let WelcomeScreen handle it
-    // WelcomeScreen will show Telegram Login Widget button for web
+    // Don't block - always show children (landing page)
+    // WelcomeScreen will handle authentication when button is clicked
 
     // Show error if authentication failed
     if (authError && !isAuthenticated) {
