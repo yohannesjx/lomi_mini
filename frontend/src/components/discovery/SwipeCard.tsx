@@ -544,13 +544,13 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        paddingBottom: SPACING.xl,
+        paddingBottom: 150, // Moved up to clear action buttons
         paddingHorizontal: SPACING.l,
         zIndex: 5,
     },
     nearbyBadge: {
         position: 'absolute',
-        bottom: 80,
+        bottom: 220,
         left: SPACING.l,
         flexDirection: 'row',
         alignItems: 'center',
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
     },
     scrollIndicator: {
         position: 'absolute',
-        bottom: 80,
+        bottom: 220,
         right: SPACING.l,
         width: 32,
         height: 32,

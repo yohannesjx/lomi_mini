@@ -965,7 +965,7 @@ const styles = StyleSheet.create({
     },
     actionsContainer: {
         position: 'absolute',
-        bottom: 90, // Height of tab bar + safe area
+        bottom: 75, // Moved down closer to nav bar
         left: 20,
         right: 20,
         flexDirection: 'row',

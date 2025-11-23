@@ -71,8 +71,8 @@ export const MainTabNavigator = () => {
                 tabBarStyle: {
                     backgroundColor: COLORS.surface,
                     borderTopColor: COLORS.surfaceHighlight,
-                    height: 90,
-                    paddingBottom: 30,
+                    height: 100,
+                    paddingBottom: 35,
                     paddingTop: 10,
                     elevation: 0, // Remove shadow on Android
                     borderTopWidth: 1,
