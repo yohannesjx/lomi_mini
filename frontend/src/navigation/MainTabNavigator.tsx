@@ -12,13 +12,12 @@ import { LikesService } from '../api/services';
 const Tab = createBottomTabNavigator();
 
 const TabIcon = ({ focused, icon, label, badgeCount }: { focused: boolean, icon: string, label: string, badgeCount?: number }) => (
-    <View style={{ alignItems: 'center', justifyContent: 'center', top: 10 }}>
+    <View style={{ alignItems: 'center', justifyContent: 'center', top: 0 }}>
         <View style={{ position: 'relative' }}>
             <Text style={{
                 fontSize: 24,
                 color: focused ? COLORS.primary : (badgeCount === 0 ? COLORS.textTertiary : COLORS.textSecondary),
                 marginBottom: 4,
-                opacity: badgeCount === 0 ? 0.4 : 1,
             }}>
                 {icon}
             </Text>
@@ -72,8 +71,11 @@ export const MainTabNavigator = () => {
                 tabBarStyle: {
                     backgroundColor: COLORS.surface,
                     borderTopColor: COLORS.surfaceHighlight,
-                    height: 80,
-                    paddingBottom: SPACING.m,
+                    height: 65,
+                    paddingBottom: 8,
+                    paddingTop: 8,
+                    position: 'absolute',
+                    bottom: 0,
                 },
                 tabBarShowLabel: false,
             }}
@@ -97,10 +99,10 @@ export const MainTabNavigator = () => {
                 component={LikesYouScreen}
                 options={{
                     tabBarIcon: ({ focused }) => (
-                        <TabIcon 
-                            focused={focused} 
-                            icon="💚" 
-                            label="Likes" 
+                        <TabIcon
+                            focused={focused}
+                            icon="💚"
+                            label="Likes"
                             badgeCount={likesBadgeCount}
                         />
                     )
