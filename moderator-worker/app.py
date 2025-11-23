@@ -14,7 +14,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from io import BytesIO
-from transformers import AutoProcessor, AutoModelForCausalLM
+from transformers import AutoImageProcessor, AutoModelForImageClassification
 import torch
 
 # Configure logging
