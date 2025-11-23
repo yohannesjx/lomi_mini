@@ -271,3 +271,35 @@ func (ns *NotificationService) NotifySomeoneViewedProfile(viewedUserID uuid.UUID
 
 	return ns.SendNotification(viewedUserID, NotificationTypeSomeoneLiked, title, body, data)
 }
+
+// SendTelegramMessage sends a simple text message via Telegram Bot API
+func (ns *NotificationService) SendTelegramMessage(telegramID int64, message string) error {
+	if ns.TelegramBotToken == "" {
+		return fmt.Errorf("Telegram bot token not configured")
+	}
+
+	payload := map[string]interface{}{
+		"chat_id": telegramID,
+		"text":    message,
+	}
+
+	payloadBytes, _ := json.Marshal(payload)
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", ns.TelegramBotToken)
+
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Telegram API returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// GetNotificationService returns the global notification service instance
+func GetNotificationService() *NotificationService {
+	return NotificationSvc
+}

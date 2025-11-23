@@ -54,6 +54,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Media
 	protected.Post("/users/media", handlers.UploadMedia)
+	protected.Post("/users/media/upload-complete", handlers.UploadComplete) // Batch upload completion
 	protected.Get("/users/:user_id/media", handlers.GetUserMedia)
 	protected.Delete("/users/media/:id", handlers.DeleteMedia)
 	protected.Get("/users/media/upload-url", handlers.GetPresignedUploadURL)

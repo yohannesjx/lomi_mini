@@ -29,6 +29,14 @@ type Media struct {
 	IsApproved     bool   `gorm:"default:false"`
 	ModerationNotes string `gorm:"type:text"`
 
+	// Photo Moderation Fields
+	ModerationStatus string         `gorm:"type:varchar(20);default:'pending';index:idx_media_moderation_status,where:moderation_status='pending'"`
+	ModerationReason string         `gorm:"type:text"`
+	ModeratedAt      time.Time      `gorm:"type:timestamptz"`
+	ModerationScores JSONMap        `gorm:"type:jsonb"` // Store blur, NSFW, face detection scores
+	RetryCount       int            `gorm:"default:0"`
+	BatchID          uuid.UUID      `gorm:"type:uuid;index"` // For batch processing (1-9 photos per session)
+
 	CreatedAt time.Time `gorm:"type:timestamptz;default:now()"`
 	UpdatedAt time.Time `gorm:"type:timestamptz;default:now()"`
 }

@@ -53,7 +53,12 @@ func main() {
 	// 7. Routes
 	routes.SetupRoutes(app)
 
-	// 8. Start Server
+	// 8. Start Moderation Subscriber (in background)
+	go func() {
+		services.StartModerationSubscriber()
+	}()
+
+	// 9. Start Server
 	log.Printf("🚀 Server starting on port %s", cfg.AppPort)
 	if err := app.Listen(":" + cfg.AppPort); err != nil {
 		log.Fatal("Server failed to start: ", err)

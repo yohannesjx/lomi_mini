@@ -120,6 +120,49 @@ services:
       timeout: 10s
       retries: 3
 
+  # CompreFace - Face Detection & Age Estimation
+  compreface:
+    image: exadel/compreface-core:latest
+    container_name: lomi_compreface
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      POSTGRES_DB: compreface
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${COMPREFACE_DB_PASSWORD:-compreface123}
+    networks:
+      - lomi_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Photo Moderation Workers (4 replicas - scale with: docker compose up --scale moderator-worker=6)
+  moderator-worker:
+    build:
+      context: ./moderator-worker
+      dockerfile: Dockerfile
+    restart: always
+    deploy:
+      replicas: 4
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDIS_DB: 0
+      COMPREFACE_URL: http://compreface:8000
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET_PHOTOS: ${S3_BUCKET_PHOTOS:-lomi-photos}
+    depends_on:
+      - redis
+      - compreface
+    networks:
+      - lomi_network
+
 networks:
   lomi_network:
     driver: bridge
