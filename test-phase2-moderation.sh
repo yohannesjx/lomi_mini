@@ -47,7 +47,8 @@ if [ -z "$TOKEN" ]; then
     AUTH_RESPONSE=$(curl -s -X POST "$API_BASE/api/v1/auth/telegram" \
         -H "Authorization: tma $INIT_DATA")
     
-    TOKEN=$(echo $AUTH_RESPONSE | jq -r '.access_token' 2>/dev/null || echo "")
+    # Extract access_token (works without jq)
+    TOKEN=$(echo "$AUTH_RESPONSE" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)
     if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
         echo -e "${RED}❌ Authentication failed${NC}"
         echo "Response: $AUTH_RESPONSE"
@@ -78,11 +79,19 @@ for i in $(seq 1 $NUM_PHOTOS); do
     UPLOAD_RESPONSE=$(curl -s -X GET "$API_BASE/api/v1/users/media/upload-url?media_type=photo" \
         -H "Authorization: Bearer $TOKEN")
     
-    UPLOAD_URL=$(echo $UPLOAD_RESPONSE | jq -r '.upload_url' 2>/dev/null || echo "")
-    FILE_KEY=$(echo $UPLOAD_RESPONSE | jq -r '.file_key' 2>/dev/null || echo "")
+    # Check for errors in response
+    if echo "$UPLOAD_RESPONSE" | grep -q '"error"'; then
+        echo -e "    ${RED}❌ Error getting upload URL: $UPLOAD_RESPONSE${NC}"
+        continue
+    fi
+    
+    # Extract upload_url and file_key (works without jq)
+    UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | grep -o '"upload_url":"[^"]*"' | cut -d'"' -f4)
+    FILE_KEY=$(echo "$UPLOAD_RESPONSE" | grep -o '"file_key":"[^"]*"' | cut -d'"' -f4)
     
     if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
-        echo -e "${RED}❌ Failed to get upload URL for photo $i${NC}"
+        echo -e "    ${RED}❌ Failed to get upload URL for photo $i${NC}"
+        echo "    Response: $UPLOAD_RESPONSE"
         continue
     fi
     
@@ -108,6 +117,14 @@ for i in $(seq 1 $NUM_PHOTOS); do
 done
 
 PHOTOS_JSON+="]"
+
+# Wrap in proper request format: {"photos": [...]}
+if [ "$PHOTOS_JSON" = "[]" ]; then
+    echo -e "${RED}❌ No photos were uploaded successfully${NC}"
+    exit 1
+fi
+
+UPLOAD_COMPLETE_BODY="{\"photos\":$PHOTOS_JSON}"
 echo ""
 
 # Step 3: Call upload-complete endpoint
@@ -117,17 +134,18 @@ echo "────────────────────────�
 UPLOAD_COMPLETE_RESPONSE=$(curl -s -X POST "$API_BASE/api/v1/users/media/upload-complete" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -d "$PHOTOS_JSON")
+    -d "$UPLOAD_COMPLETE_BODY")
 
 echo "Response:"
-echo "$UPLOAD_COMPLETE_RESPONSE" | jq '.' 2>/dev/null || echo "$UPLOAD_COMPLETE_RESPONSE"
+echo "$UPLOAD_COMPLETE_RESPONSE"
 echo ""
 
-BATCH_ID=$(echo $UPLOAD_COMPLETE_RESPONSE | jq -r '.batch_id' 2>/dev/null || echo "")
+# Extract batch_id (works without jq)
+BATCH_ID=$(echo "$UPLOAD_COMPLETE_RESPONSE" | grep -o '"batch_id":"[^"]*"' | cut -d'"' -f4)
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API_BASE/api/v1/users/media/upload-complete" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -d "$PHOTOS_JSON")
+    -d "$UPLOAD_COMPLETE_BODY")
 
 if [ "$HTTP_STATUS" = "200" ] && [ -n "$BATCH_ID" ] && [ "$BATCH_ID" != "null" ]; then
     echo -e "${GREEN}✅ Upload-complete successful!${NC}"
