@@ -15,8 +15,11 @@ export interface AuthResponse {
 
 export const AuthService = {
     telegramLogin: async (initData: string): Promise<AuthResponse> => {
-        const response = await api.post<AuthResponse>('/auth/telegram', {
-            init_data: initData,
+        // Use Telegram Mini Apps SDK approach: send initData in Authorization header
+        const response = await api.post<AuthResponse>('/auth/telegram', {}, {
+            headers: {
+                'Authorization': `tma ${initData}`,
+            },
         });
         return response.data;
     },
