@@ -48,6 +48,30 @@ export const AuthService = {
         }
     },
 
+    telegramWidgetLogin: async (authData: {
+        id: string;
+        first_name: string;
+        last_name?: string;
+        username?: string;
+        photo_url?: string;
+        auth_date: string;
+        hash: string;
+    }): Promise<AuthResponse> => {
+        // Telegram Login Widget sends data via query params or POST body
+        // We'll send it as query params to match backend expectation
+        const params = new URLSearchParams();
+        params.append('id', authData.id);
+        params.append('first_name', authData.first_name);
+        if (authData.last_name) params.append('last_name', authData.last_name);
+        if (authData.username) params.append('username', authData.username);
+        if (authData.photo_url) params.append('photo_url', authData.photo_url);
+        params.append('auth_date', authData.auth_date);
+        params.append('hash', authData.hash);
+
+        const response = await api.get<AuthResponse>(`/auth/telegram/widget?${params.toString()}`);
+        return response.data;
+    },
+
     logout: async () => {
         // TODO: Clear tokens from storage
     },

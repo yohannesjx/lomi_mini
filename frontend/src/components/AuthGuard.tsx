@@ -44,10 +44,21 @@ export const AuthGuard: React.FC<{
             const inTelegram = isTelegramWebApp();
             setIsInTelegram(inTelegram);
 
+            // Step 1.5: Check if we're handling a Telegram Widget OAuth callback
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                const urlParams = new URLSearchParams(window.location.search);
+                if (urlParams.has('id') && urlParams.has('hash') && urlParams.has('auth_date')) {
+                    console.log('🔐 Detected Telegram Widget OAuth callback');
+                    // Handle widget callback - will be handled by WelcomeScreen
+                    setIsCheckingAuth(false);
+                    return;
+                }
+            }
+
             if (!inTelegram) {
-                console.log('⚠️ App not opened in Telegram');
+                console.log('⚠️ App not opened in Telegram - showing web login option');
                 setIsCheckingAuth(false);
-                return;
+                return; // Show welcome screen with web login button
             }
 
             // Step 2: Load existing tokens (if any)
@@ -168,8 +179,8 @@ export const AuthGuard: React.FC<{
         }
     };
 
-    // Show loading screen while checking authentication
-    if (isCheckingAuth || isLoading) {
+    // Show loading screen while checking authentication (only if in Telegram)
+    if ((isCheckingAuth || isLoading) && isInTelegram === true) {
         return (
             <View style={styles.container}>
                 <View style={styles.loadingContent}>
@@ -181,25 +192,8 @@ export const AuthGuard: React.FC<{
         );
     }
 
-    // Show error if not in Telegram
-    if (isInTelegram === false) {
-        return (
-            <View style={styles.container}>
-                <View style={styles.errorContent}>
-                    <Text style={styles.errorIcon}>📱</Text>
-                    <Text style={styles.errorTitle}>Please open this app from inside Telegram</Text>
-                    <Text style={styles.errorMessage}>
-                        This app must be opened from Telegram to authenticate securely.
-                    </Text>
-                    <Button
-                        title="Open in Telegram"
-                        onPress={handleOpenInTelegram}
-                        style={styles.button}
-                    />
-                </View>
-            </View>
-        );
-    }
+    // Don't block web browsers - let WelcomeScreen handle it
+    // WelcomeScreen will show Telegram Login Widget button for web
 
     // Show error if authentication failed
     if (authError && !isAuthenticated) {

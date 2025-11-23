@@ -9,6 +9,15 @@ interface AuthState {
     isAuthenticated: boolean;
     isLoading: boolean;
     login: (initData: string) => Promise<void>;
+    loginWithWidget: (authData: {
+        id: string;
+        first_name: string;
+        last_name?: string;
+        username?: string;
+        photo_url?: string;
+        auth_date: string;
+        hash: string;
+    }) => Promise<void>;
     logout: () => Promise<void>;
     setTokens: (tokens: { accessToken: string; refreshToken: string }) => Promise<void>;
     loadTokens: () => Promise<boolean>;
@@ -28,6 +37,26 @@ export const useAuthStore = create<AuthState>((set) => ({
     login: async (initData: string) => {
         try {
             const response: AuthResponse = await AuthService.telegramLogin(initData);
+            await storage.setItem(TOKEN_KEY, response.access_token);
+            await storage.setItem(REFRESH_TOKEN_KEY, response.refresh_token);
+            await storage.setItem(USER_KEY, JSON.stringify(response.user));
+            
+            set({
+                accessToken: response.access_token,
+                refreshToken: response.refresh_token,
+                user: response.user,
+                isAuthenticated: true,
+                isLoading: false,
+            });
+        } catch (error) {
+            set({ isLoading: false });
+            throw error;
+        }
+    },
+
+    loginWithWidget: async (authData) => {
+        try {
+            const response: AuthResponse = await AuthService.telegramWidgetLogin(authData);
             await storage.setItem(TOKEN_KEY, response.access_token);
             await storage.setItem(REFRESH_TOKEN_KEY, response.refresh_token);
             await storage.setItem(USER_KEY, JSON.stringify(response.user));

@@ -10,10 +10,20 @@ import { useAuthStore } from '../../store/authStore';
 const { width, height } = Dimensions.get('window');
 
 export const WelcomeScreen = ({ navigation }: any) => {
-    const { login, isLoading } = useAuthStore();
+    const { login, loginWithWidget, isLoading } = useAuthStore();
     const [isInTelegram, setIsInTelegram] = useState<boolean | null>(null);
+    const [isWebBrowser, setIsWebBrowser] = useState(false);
 
     useEffect(() => {
+        // Handle Telegram Widget OAuth callback (for web browsers)
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('id') && urlParams.has('hash') && urlParams.has('auth_date')) {
+                console.log('🔐 Handling Telegram Widget OAuth callback');
+                handleWidgetCallback(urlParams);
+                return;
+            }
+        }
         // Early detection: Check if we're in Telegram BEFORE doing anything else
         if (Platform.OS === 'web') {
             const debugInfo = getTelegramDebugInfo();
@@ -37,10 +47,10 @@ export const WelcomeScreen = ({ navigation }: any) => {
             );
             
             setIsInTelegram(isActuallyInTelegram);
+            setIsWebBrowser(!isActuallyInTelegram); // Show widget button for web browsers
             
             if (!isActuallyInTelegram) {
-                console.error('❌ App is NOT in Telegram browser!');
-                console.error('Debug info:', debugInfo);
+                console.log('🌐 App opened in web browser - will show Telegram Login Widget');
                 // Don't initialize Telegram WebApp if not in Telegram
                 return;
             }
@@ -78,6 +88,46 @@ export const WelcomeScreen = ({ navigation }: any) => {
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isInTelegram]); // Include isInTelegram in deps
+
+    const handleWidgetCallback = async (urlParams: URLSearchParams) => {
+        try {
+            const authData = {
+                id: urlParams.get('id') || '',
+                first_name: urlParams.get('first_name') || '',
+                last_name: urlParams.get('last_name') || undefined,
+                username: urlParams.get('username') || undefined,
+                photo_url: urlParams.get('photo_url') || undefined,
+                auth_date: urlParams.get('auth_date') || '',
+                hash: urlParams.get('hash') || '',
+            };
+
+            if (!authData.id || !authData.hash || !authData.auth_date) {
+                throw new Error('Missing required authentication data');
+            }
+
+            console.log('🔐 Processing Telegram Widget authentication...');
+            await loginWithWidget(authData);
+
+            // Clear URL params
+            if (typeof window !== 'undefined') {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+
+            // Navigate based on user profile
+            const user = useAuthStore.getState().user;
+            if (user?.has_profile) {
+                navigation.navigate('Main');
+            } else {
+                navigation.navigate('ProfileSetup');
+            }
+        } catch (error: any) {
+            console.error('❌ Widget login error:', error);
+            Alert.alert(
+                'Login Failed',
+                error?.response?.data?.error || error?.message || 'Failed to authenticate with Telegram'
+            );
+        }
+    };
 
     const handleLogin = async () => {
         try {
@@ -375,20 +425,43 @@ export const WelcomeScreen = ({ navigation }: any) => {
                         Serious dating, culture, and fun.
                     </Text>
 
-                    {/* Show custom button only if Telegram MainButton is not available */}
-                    {Platform.OS !== 'web' || !getTelegramWebApp() ? (
-                        <Button
-                            title="Continue with Telegram"
-                            onPress={handleLogin}
-                            style={styles.button}
-                            size="large"
-                        />
-                    ) : (
-                        <View style={styles.buttonPlaceholder}>
-                            <Text style={styles.buttonPlaceholderText}>
-                                Use the button at the bottom
-                            </Text>
+                    {/* Show Telegram Login Widget for web browsers */}
+                    {Platform.OS === 'web' && isWebBrowser && (
+                        <View style={styles.widgetContainer}>
+                            <div
+                                id="telegram-login-widget"
+                                dangerouslySetInnerHTML={{
+                                    __html: `
+                                        <script async src="https://telegram.org/js/telegram-widget.js?22"
+                                            data-telegram-login="lomi_social_bot"
+                                            data-size="large"
+                                            data-auth-url="${typeof window !== 'undefined' ? window.location.origin : 'https://lomi.social'}/api/v1/auth/telegram/widget"
+                                            data-request-access="write"
+                                            data-userpic="true"
+                                            data-radius="12">
+                                        </script>
+                                    `,
+                                }}
+                            />
                         </View>
+                    )}
+
+                    {/* Show custom button for Telegram Mini App or mobile */}
+                    {(Platform.OS !== 'web' || !isWebBrowser) && (
+                        Platform.OS !== 'web' || !getTelegramWebApp() ? (
+                            <Button
+                                title="Continue with Telegram"
+                                onPress={handleLogin}
+                                style={styles.button}
+                                size="large"
+                            />
+                        ) : (
+                            <View style={styles.buttonPlaceholder}>
+                                <Text style={styles.buttonPlaceholderText}>
+                                    Use the button at the bottom
+                                </Text>
+                            </View>
+                        )
                     )}
 
                     <Text style={styles.terms}>
@@ -604,5 +677,11 @@ const styles = StyleSheet.create({
         color: COLORS.textTertiary,
         fontFamily: 'monospace',
         marginBottom: SPACING.xs,
+    },
+    widgetContainer: {
+        marginBottom: SPACING.m,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 50,
     },
 });
