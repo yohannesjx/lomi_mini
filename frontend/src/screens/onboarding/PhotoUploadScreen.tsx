@@ -235,11 +235,22 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                 if (photo.fileKey) {
                     console.log(`📸 Creating media record ${i + 1}/${uploadedPhotos.length} - FileKey: ${photo.fileKey}`);
                     try {
-                        await UserService.uploadMedia({
+                        const result = await UserService.uploadMedia({
                             media_type: 'photo',
-                        file_key: photo.fileKey,
-                        display_order: i + 1,
-                    });
+                            file_key: photo.fileKey,
+                            display_order: i,
+                        });
+                        console.log(`✅ Media record created: ${result.id}`);
+                    } catch (error: any) {
+                        console.error(`❌ Failed to create media record for photo ${i + 1}:`, {
+                            error,
+                            message: error?.message,
+                            response: error?.response?.data,
+                            status: error?.response?.status,
+                            fileKey: photo.fileKey,
+                        });
+                        throw error; // Re-throw to show error to user
+                    }
                 }
             }
             navigation.navigate('Interests');
