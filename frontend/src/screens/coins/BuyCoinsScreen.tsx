@@ -22,9 +22,9 @@ const PAYMENT_METHODS = [
 
 export const BuyCoinsScreen = ({ navigation, route }: any) => {
     const { user } = useAuthStore();
-    const preselectedCoins = route?.params?.preselectedPackage || 500;
+    const preselectedPackId = route?.params?.preselectedPackage || 'flame';
     const customMessage = route?.params?.message;
-    const initialPackage = COIN_PACKAGES.find(p => p.coins === preselectedCoins) || COIN_PACKAGES[1];
+    const initialPackage = COIN_PACKAGES.find(p => p.id === preselectedPackId) || COIN_PACKAGES[1];
     const [selectedPackage, setSelectedPackage] = useState(initialPackage);
     const [selectedPayment, setSelectedPayment] = useState(PAYMENT_METHODS[0]);
     const [isPurchasing, setIsPurchasing] = useState(false);
