@@ -71,8 +71,10 @@ export const VideoScreen = ({ navigation }: any) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.content}>
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <View style={styles.content}>
                 <View style={styles.header}>
                     <Text style={styles.title}>Add a video (Optional)</Text>
                     <Text style={styles.subtitle}>
