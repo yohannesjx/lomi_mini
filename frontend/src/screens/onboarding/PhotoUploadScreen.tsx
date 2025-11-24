@@ -8,6 +8,7 @@ import { BackButton } from '../../components/ui/BackButton';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
+import { useOnboardingStore } from '../../store/onboardingStore';
 import { TOTAL_ONBOARDING_STEPS } from '../../navigation/OnboardingNavigator';
 import axios from 'axios';
 
@@ -30,6 +31,7 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
     const [uploadInProgress, setUploadInProgress] = useState<Set<number>>(new Set()); // Track which indices are uploading
     const [hasCalledUploadComplete, setHasCalledUploadComplete] = useState(false); // Prevent duplicate calls
     const uploadInProgressRef = useRef<Set<number>>(new Set()); // Ref for synchronous checking
+    const { updateStep } = useOnboardingStore();
 
     const compressImage = async (uri: string): Promise<string> => {
         try {
@@ -466,8 +468,23 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                 uploadCompleteResult = await UserService.uploadComplete(photosBatch);
                 console.log('✅ Upload-complete response:', uploadCompleteResult);
                 
-                // Navigate to status screen on success
-                navigateToStatusScreen(uploadCompleteResult);
+                // Update onboarding step to 5 (photos done)
+                try {
+                    await updateStep(5);
+                    console.log('✅ Onboarding step updated to 5');
+                } catch (stepError: any) {
+                    console.warn('⚠️ Failed to update onboarding step, but continuing:', stepError);
+                    // Don't block navigation if step update fails
+                }
+                
+                // Navigate to next step (Video) or status screen
+                if (navigation && navigation.navigate) {
+                    console.log('🧭 Navigating to Video screen...');
+                    navigation.navigate('Video');
+                } else {
+                    console.error('❌ Navigation not available, trying fallback...');
+                    navigateToStatusScreen(uploadCompleteResult);
+                }
             } catch (error: any) {
                 // Handle 429 rate limit error
                 if (error?.response?.status === 429) {
