@@ -124,6 +124,7 @@ services:
       retries: 3
 
   # CompreFace - Face Detection & Age Estimation
+  # Note: CompreFace-core requires PostgreSQL. We'll use the existing postgres service.
   compreface:
     image: exadel/compreface-core:latest
     container_name: lomi_compreface
@@ -131,16 +132,26 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
+      # Use existing PostgreSQL service
+      POSTGRES_USER: ${DB_USER:-lomi}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: compreface
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${COMPREFACE_DB_PASSWORD:-compreface123}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      # CompreFace specific settings
+      ML_PORT: 3000
+      ADMIN_JWT_SECRET: ${COMPREFACE_JWT_SECRET:-compreface-secret-change-in-production}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - lomi_network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
+      start_period: 120s  # Give CompreFace 2 minutes to start
 
   # Photo Moderation Workers (4 replicas - scale with: docker compose up --scale moderator-worker=6)
   moderator-worker:
