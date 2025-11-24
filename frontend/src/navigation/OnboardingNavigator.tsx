@@ -63,22 +63,32 @@ export const OnboardingNavigator: React.FC<{ navigation: any }> = ({ navigation 
     const { isAuthenticated, user } = useAuthStore();
     const [initialRoute, setInitialRoute] = useState<string | null>(null);
     const [hasShownWelcomeBack, setHasShownWelcomeBack] = useState(false);
+    const [hasFetchedStatus, setHasFetchedStatus] = useState(false);
 
     useEffect(() => {
         // Fetch onboarding status when component mounts
-        if (isAuthenticated) {
-            fetchStatus();
+        if (isAuthenticated && !hasFetchedStatus) {
+            fetchStatus().then(() => {
+                setHasFetchedStatus(true);
+            }).catch(() => {
+                setHasFetchedStatus(true); // Still set to true even on error to prevent infinite loading
+            });
         }
-    }, [isAuthenticated, fetchStatus]);
+    }, [isAuthenticated, fetchStatus, hasFetchedStatus]);
 
     useEffect(() => {
         // Determine initial route based on onboarding step
-        if (!isLoading && onboardingStep !== undefined) {
-            const targetScreen = STEP_TO_SCREEN[onboardingStep] || 'ProfileSetup';
+        // Use user.onboarding_step as fallback if store hasn't loaded yet
+        const currentStep = user?.onboarding_step ?? onboardingStep ?? 0;
+        const currentCompleted = user?.onboarding_completed ?? onboardingCompleted ?? false;
+        
+        // Only set route if we've either fetched status or have user data
+        if ((!isLoading && hasFetchedStatus) || (user && user.onboarding_step !== undefined)) {
+            const targetScreen = STEP_TO_SCREEN[currentStep] || 'ProfileSetup';
             setInitialRoute(targetScreen);
 
             // Show welcome back toast if resuming (step > 0)
-            if (onboardingStep > 0 && !onboardingCompleted && !hasShownWelcomeBack) {
+            if (currentStep > 0 && !currentCompleted && !hasShownWelcomeBack) {
                 setHasShownWelcomeBack(true);
                 const message = 'Welcome back! Continuing where you left off...';
                 if (Platform.OS === 'android' && ToastAndroid) {
@@ -89,7 +99,7 @@ export const OnboardingNavigator: React.FC<{ navigation: any }> = ({ navigation 
                 }
             }
         }
-    }, [onboardingStep, onboardingCompleted, isLoading, hasShownWelcomeBack]);
+    }, [onboardingStep, onboardingCompleted, isLoading, hasShownWelcomeBack, user, hasFetchedStatus]);
 
     // If onboarding is completed, navigate to Main
     useEffect(() => {
