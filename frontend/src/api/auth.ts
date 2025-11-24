@@ -50,15 +50,32 @@ export const AuthService = {
 
     googleLogin: async (idToken: string): Promise<AuthResponse> => {
         try {
+            // Debug: Decode token to check audience
+            try {
+                const payload = JSON.parse(atob(idToken.split('.')[1]));
+                console.log('🔍 Token payload:', {
+                    aud: payload.aud,
+                    email: payload.email,
+                    email_verified: payload.email_verified,
+                    iss: payload.iss,
+                });
+            } catch (e) {
+                console.warn('⚠️ Could not decode token for debugging:', e);
+            }
+
+            console.log('📤 Sending Google login request with id_token (length:', idToken.length, ')');
             const response = await api.post<AuthResponse>('/auth/google', {
                 id_token: idToken,
             });
+            console.log('✅ Google login successful!');
             return response.data;
         } catch (error: any) {
             console.error('❌ Google login failed:', {
                 message: error?.message,
                 status: error?.response?.status,
+                statusText: error?.response?.statusText,
                 data: error?.response?.data,
+                errorDetails: error?.response?.data?.details,
             });
             throw error;
         }

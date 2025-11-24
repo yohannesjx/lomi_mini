@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -345,9 +346,23 @@ func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
 		})
 	}
 
+	log.Printf("🔍 Validating Google token with client ID: %s", h.cfg.GoogleClientID)
+	log.Printf("🔍 Token length: %d", len(req.IDToken))
+
 	payload, err := idtoken.Validate(context.Background(), req.IDToken, h.cfg.GoogleClientID)
 	if err != nil {
 		log.Printf("❌ Google token validation failed: %v", err)
+		log.Printf("❌ Error type: %T", err)
+
+		// Try to decode token to see what audience it has
+		parts := strings.Split(req.IDToken, ".")
+		if len(parts) >= 2 {
+			decoded, decodeErr := base64.RawURLEncoding.DecodeString(parts[1])
+			if decodeErr == nil {
+				log.Printf("🔍 Token payload (for debugging): %s", string(decoded))
+			}
+		}
+
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error":   "Invalid Google token",
 			"details": err.Error(),
