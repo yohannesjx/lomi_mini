@@ -45,8 +45,9 @@ export const VideoScreen = ({ navigation }: any) => {
             // Update onboarding step to 6 (video done, even if skipped)
             await updateStep(6);
             navigation.navigate('Bio');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Update step error:', error);
+            Alert.alert('Error', 'Failed to save progress. Please try again.');
         } finally {
             setIsSaving(false);
         }
@@ -63,8 +64,9 @@ export const VideoScreen = ({ navigation }: any) => {
             // Update onboarding step to 6 (video done)
             await updateStep(6);
             navigation.navigate('Bio');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Update step error:', error);
+            Alert.alert('Error', 'Failed to save progress. Please try again.');
         } finally {
             setIsSaving(false);
         }
@@ -104,7 +106,7 @@ export const VideoScreen = ({ navigation }: any) => {
                     <Button
                         title={hasVideo ? "Continue" : "Skip for now"}
                         onPress={hasVideo ? handleNext : handleSkip}
-                        loading={isSaving}
+                        isLoading={isSaving}
                         size="large"
                         variant={hasVideo ? "primary" : "secondary"}
                     />

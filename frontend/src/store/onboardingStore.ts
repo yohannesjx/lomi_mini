@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { OnboardingService, OnboardingStatus } from '../api/onboarding';
+import { useAuthStore } from './authStore';
 
 interface OnboardingState {
     onboardingStep: number;
@@ -7,7 +8,7 @@ interface OnboardingState {
     progress: number;
     isLoading: boolean;
     fetchStatus: () => Promise<void>;
-    updateStep: (step: number, completed?: boolean) => Promise<void>;
+    updateStep: (step: number, completed?: boolean) => Promise<OnboardingStatus>;
     reset: () => void;
 }
 
@@ -44,6 +45,16 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
                 progress: status.progress,
             });
             console.log(`✅ Onboarding step updated: ${step}, completed: ${status.onboarding_completed}`);
+            
+            // Refresh user data to get updated onboarding_step
+            try {
+                await useAuthStore.getState().refreshUser();
+                console.log('✅ User data refreshed with updated onboarding step');
+            } catch (refreshError) {
+                console.warn('⚠️ Failed to refresh user data after step update:', refreshError);
+                // Don't throw - step update was successful
+            }
+            
             return status;
         } catch (error: any) {
             console.error('❌ Failed to update onboarding step:', error);

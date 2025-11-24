@@ -71,13 +71,8 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
 
             // Update onboarding step to 1 (age & gender done)
             console.log('📤 Updating onboarding step to 1...');
-            try {
-                await updateStep(1);
-                console.log('✅ Onboarding step updated');
-            } catch (stepError: any) {
-                console.warn('⚠️ Failed to update onboarding step, but continuing:', stepError);
-                // Don't block navigation if step update fails
-            }
+            await updateStep(1);
+            console.log('✅ Onboarding step updated');
 
             // Navigate to next step (city)
             console.log('🧭 Navigating to City screen...');

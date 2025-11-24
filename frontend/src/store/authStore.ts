@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { storage } from '../utils/storage';
 import { AuthService, AuthResponse } from '../api/auth';
+import { UserService } from '../api/services';
 
 interface AuthState {
     accessToken: string | null;
@@ -22,6 +23,7 @@ interface AuthState {
     logout: () => Promise<void>;
     setTokens: (tokens: { accessToken: string; refreshToken: string }) => Promise<void>;
     loadTokens: () => Promise<boolean>;
+    refreshUser: () => Promise<void>;
 }
 
 const TOKEN_KEY = 'lomi_access_token';
@@ -145,6 +147,18 @@ export const useAuthStore = create<AuthState>((set) => ({
             console.error('❌ Error loading tokens:', error);
             set({ isLoading: false });
             return false;
+        }
+    },
+
+    refreshUser: async () => {
+        try {
+            const updatedUser = await UserService.getMe();
+            await storage.setItem(USER_KEY, JSON.stringify(updatedUser));
+            set({ user: updatedUser });
+            console.log('✅ User data refreshed');
+        } catch (error) {
+            console.error('❌ Failed to refresh user data:', error);
+            throw error;
         }
     },
 }));
