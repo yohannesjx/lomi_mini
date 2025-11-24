@@ -218,28 +218,30 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
 
         setIsSubmitting(true);
         try {
-            // Register only the photos that have finished uploading
-            const uploadedPhotos = photos.filter(p => p.fileKey !== null);
+            // Collect all uploaded photos (with file keys)
+            const uploadedPhotos = photos
+                .map((photo, index) => ({
+                    photo,
+                    index,
+                }))
+                .filter(({ photo }) => photo.fileKey !== null);
 
-            console.log(`📸 Registering ${uploadedPhotos.length} uploaded photos with backend...`);
-
-            for (let i = 0; i < photos.length; i++) {
-                const photo = photos[i];
-                if (photo.fileKey) {
-                    console.log(`📸 Creating media record ${i + 1} - FileKey: ${photo.fileKey}`);
-                    try {
-                        const result = await UserService.uploadMedia({
-                            media_type: 'photo',
-                            file_key: photo.fileKey,
-                            display_order: i,
-                        });
-                        console.log(`✅ Media record created: ${result.id}`);
-                    } catch (error: any) {
-                        console.error(`❌ Failed to create media record for photo ${i + 1}:`, error);
-                        // Continue with other photos even if one fails
-                    }
-                }
+            if (uploadedPhotos.length === 0) {
+                Alert.alert('No Photos', 'Please wait for photos to finish uploading.');
+                return;
             }
+
+            console.log(`📸 Registering ${uploadedPhotos.length} uploaded photos with backend (batch moderation)...`);
+
+            // NEW: Use batch upload-complete endpoint (triggers moderation)
+            const photosBatch = uploadedPhotos.map(({ photo }) => ({
+                file_key: photo.fileKey!,
+                media_type: 'photo' as const,
+            }));
+
+            console.log('📤 Calling upload-complete endpoint with batch:', photosBatch);
+            const uploadCompleteResult = await UserService.uploadComplete(photosBatch);
+            console.log('✅ Upload-complete response:', uploadCompleteResult);
 
             // Update onboarding step
             console.log('📤 Updating onboarding step to 5...');

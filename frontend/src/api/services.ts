@@ -39,6 +39,14 @@ export const UserService = {
         });
         return response.data;
     },
+
+    // Batch upload completion - triggers photo moderation
+    uploadComplete: async (photos: Array<{ file_key: string; media_type: 'photo' | 'video' }>) => {
+        const response = await api.post('/users/media/upload-complete', {
+            photos,
+        });
+        return response.data;
+    },
 };
 
 // Discovery Service
