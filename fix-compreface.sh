@@ -56,7 +56,15 @@ echo ""
 
 # Test from within Docker network (this is what workers use)
 echo "3. Testing from Docker network (what workers use)..."
-NETWORK_TEST=$(docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T redis curl -s -w "\nHTTP_CODE:%{http_code}" --connect-timeout 10 "http://compreface:8000/api/v1/health" 2>&1 || echo "FAILED")
+# Try from backend container (has curl) or worker container (has python/requests)
+if docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend curl --version >/dev/null 2>&1; then
+    NETWORK_TEST=$(docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T backend curl -s -w "\nHTTP_CODE:%{http_code}" --connect-timeout 10 "http://compreface:8000/api/v1/health" 2>&1 || echo "FAILED")
+elif docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T moderator-worker python3 -c "import requests; r=requests.get('http://compreface:8000/api/v1/health', timeout=10); print(r.text); print(f'HTTP_CODE:{r.status_code}')" 2>&1; then
+    NETWORK_TEST=$(docker-compose -f docker-compose.prod.yml --env-file .env.production exec -T moderator-worker python3 -c "import requests; r=requests.get('http://compreface:8000/api/v1/health', timeout=10); print(r.text); print(f'HTTP_CODE:{r.status_code}')" 2>&1 || echo "FAILED")
+else
+    # Fallback: test from host
+    NETWORK_TEST=$(curl -s -w "\nHTTP_CODE:%{http_code}" --connect-timeout 10 "http://localhost:8000/api/v1/health" 2>&1 || echo "FAILED")
+fi
 NETWORK_HTTP=$(echo "$NETWORK_TEST" | grep "HTTP_CODE:" | cut -d: -f2 || echo "000")
 NETWORK_BODY=$(echo "$NETWORK_TEST" | grep -v "HTTP_CODE:" | head -1)
 
