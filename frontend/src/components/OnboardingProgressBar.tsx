@@ -1,28 +1,27 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { COLORS, SPACING } from '../theme/colors';
+import { TOTAL_ONBOARDING_STEPS } from '../navigation/OnboardingNavigator';
 
 interface OnboardingProgressBarProps {
     currentStep: number;
     totalSteps?: number;
-    showStepNumbers?: boolean;
 }
-
-import { TOTAL_ONBOARDING_STEPS } from '../navigation/OnboardingNavigator';
-
-const TOTAL_STEPS = TOTAL_ONBOARDING_STEPS;
 
 export const OnboardingProgressBar: React.FC<OnboardingProgressBarProps> = ({
     currentStep,
-    totalSteps = TOTAL_STEPS,
-    showStepNumbers = true,
+    totalSteps = TOTAL_ONBOARDING_STEPS,
 }) => {
     const progressAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        // Calculate progress: currentStep is 0-indexed, so we add 1 for display
+        // Progress should be (currentStep + 1) / totalSteps
+        const progress = (currentStep + 1) / totalSteps;
+        
         // Animate progress bar
         Animated.spring(progressAnim, {
-            toValue: currentStep / totalSteps,
+            toValue: progress,
             useNativeDriver: false,
             tension: 50,
             friction: 7,
@@ -36,13 +35,6 @@ export const OnboardingProgressBar: React.FC<OnboardingProgressBarProps> = ({
 
     return (
         <View style={styles.container}>
-            {showStepNumbers && (
-                <View style={styles.stepInfo}>
-                    <Text style={styles.stepText}>
-                        Step {currentStep + 1} of {totalSteps}
-                    </Text>
-                </View>
-            )}
             <View style={styles.progressBarContainer}>
                 <View style={styles.progressBarBackground}>
                     <Animated.View
@@ -55,6 +47,9 @@ export const OnboardingProgressBar: React.FC<OnboardingProgressBarProps> = ({
                     />
                 </View>
             </View>
+            <Text style={styles.stepText}>
+                Step {currentStep + 1} of {totalSteps}
+            </Text>
         </View>
     );
 };
@@ -65,19 +60,9 @@ const styles = StyleSheet.create({
         paddingVertical: SPACING.m,
         backgroundColor: COLORS.background,
     },
-    stepInfo: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: SPACING.xs,
-    },
-    stepText: {
-        fontSize: 14,
-        color: COLORS.textSecondary,
-        fontWeight: '500',
-    },
     progressBarContainer: {
         width: '100%',
+        marginBottom: SPACING.xs,
     },
     progressBarBackground: {
         height: 4,
@@ -89,6 +74,12 @@ const styles = StyleSheet.create({
         height: '100%',
         backgroundColor: COLORS.primary,
         borderRadius: 2,
+    },
+    stepText: {
+        fontSize: 12,
+        color: COLORS.textSecondary,
+        textAlign: 'center',
+        fontWeight: '500',
     },
 });
 

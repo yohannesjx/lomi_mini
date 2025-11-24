@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { COLORS, SPACING } from '../../theme/colors';
+import { TOTAL_ONBOARDING_STEPS } from '../../navigation/OnboardingNavigator';
 
 interface ProgressBarProps {
     currentStep: number;
@@ -9,9 +10,10 @@ interface ProgressBarProps {
 
 export const ProgressBar: React.FC<ProgressBarProps> = ({
     currentStep,
-    totalSteps = 8
+    totalSteps = TOTAL_ONBOARDING_STEPS
 }) => {
-    const progress = (currentStep / totalSteps) * 100;
+    // Calculate progress: currentStep is 0-indexed, so we add 1 for display
+    const progress = ((currentStep + 1) / totalSteps) * 100;
     const progressAnim = React.useRef(new Animated.Value(0)).current;
 
     React.useEffect(() => {
@@ -38,7 +40,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
                 />
             </View>
             <Text style={styles.stepText}>
-                Step {currentStep} of {totalSteps}
+                Step {currentStep + 1} of {totalSteps}
             </Text>
         </View>
     );

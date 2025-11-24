@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useOnboardingStore } from '../store/onboardingStore';
 import { useAuthStore } from '../store/authStore';
-import { OnboardingProgressBar } from '../components/OnboardingProgressBar';
 import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { COLORS } from '../theme/colors';
 
@@ -115,7 +114,6 @@ export const OnboardingNavigator: React.FC<{ navigation: any }> = ({ navigation 
 
     return (
         <View style={styles.container}>
-            <OnboardingProgressBar currentStep={currentStep} />
             <Stack.Navigator
                 initialRouteName={initialRoute}
                 screenOptions={{
