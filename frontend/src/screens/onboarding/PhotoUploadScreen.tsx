@@ -486,28 +486,40 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                     navigateToStatusScreen(uploadCompleteResult);
                 }
             } catch (error: any) {
-                // Handle 429 rate limit error
+                // Handle 429 rate limit error - photos are already uploaded, so allow continuation
                 if (error?.response?.status === 429) {
-                    const errorMessage = error?.response?.data?.message || 'Too many requests. Please try again later.';
-                    Alert.alert(
-                        'Rate Limit Exceeded',
-                        errorMessage + '\n\nYou can continue with your current photos or try again later.',
-                        [
-                            {
-                                text: 'Continue Anyway',
-                                onPress: () => {
-                                    // Continue navigation even if rate limited (use null batchId)
-                                    navigateToStatusScreen(null);
-                                }
-                            },
-                            {
-                                text: 'OK',
-                                style: 'cancel'
-                            }
-                        ]
-                    );
+                    console.warn('⚠️ Rate limit exceeded, but photos are uploaded. Continuing...');
+                    const errorMessage = error?.response?.data?.message || 'Maximum 30 photos per 24 hours.';
+                    
+                    // Update onboarding step even on rate limit (photos are uploaded)
+                    try {
+                        await updateStep(5);
+                        console.log('✅ Onboarding step updated to 5 (despite rate limit)');
+                    } catch (stepError: any) {
+                        console.warn('⚠️ Failed to update onboarding step:', stepError);
+                    }
+                    
+                    // Navigate to next step anyway (photos are already uploaded to R2)
+                    if (navigation && navigation.navigate) {
+                        console.log('🧭 Navigating to Video screen (rate limited but continuing)...');
+                        navigation.navigate('Video');
+                        // Show non-blocking message
+                        setTimeout(() => {
+                            Alert.alert(
+                                'Photo Limit Reached',
+                                errorMessage + '\n\nYour photos are uploaded and will be reviewed. You can continue with onboarding.',
+                                [{ text: 'OK' }]
+                            );
+                        }, 500);
+                    } else {
+                        console.error('❌ Navigation not available');
+                        Alert.alert(
+                            'Photo Limit Reached',
+                            errorMessage + '\n\nYour photos are uploaded. Please continue manually.',
+                            [{ text: 'OK' }]
+                        );
+                    }
                     setIsSubmitting(false);
-                    setHasCalledUploadComplete(false); // Allow retry
                     return;
                 }
                 throw error; // Re-throw other errors
