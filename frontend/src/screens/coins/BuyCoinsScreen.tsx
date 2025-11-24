@@ -289,7 +289,13 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: 'bold',
         color: COLORS.textPrimary,
+        marginBottom: SPACING.xs,
+    },
+    sectionSubtitle: {
+        fontSize: 14,
+        color: COLORS.primary,
         marginBottom: SPACING.m,
+        fontWeight: '600',
     },
     packageCard: {
         backgroundColor: COLORS.surface,
