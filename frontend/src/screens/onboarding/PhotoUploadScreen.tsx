@@ -27,6 +27,8 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
         { uri: null, fileKey: null, isUploading: false },
     ]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [uploadInProgress, setUploadInProgress] = useState<Set<number>>(new Set()); // Track which indices are uploading
+    const [hasCalledUploadComplete, setHasCalledUploadComplete] = useState(false); // Prevent duplicate calls
 
     const compressImage = async (uri: string): Promise<string> => {
         try {
@@ -136,10 +138,19 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
         });
 
         if (!result.canceled && result.assets[0]) {
+            // Prevent uploading if this index is already uploading
+            if (uploadInProgress.has(index)) {
+                console.warn(`⚠️ Upload already in progress for index ${index}`);
+                return;
+            }
+
             const originalUri = result.assets[0].uri;
             const newPhotos = [...photos];
             newPhotos[index] = { uri: originalUri, fileKey: null, isUploading: true };
             setPhotos(newPhotos);
+            
+            // Mark this index as uploading
+            setUploadInProgress(prev => new Set(prev).add(index));
 
             // Compress image before uploading
             try {
@@ -155,6 +166,12 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                 Alert.alert('Error', 'Failed to process image. Please try again.');
                 newPhotos[index] = { uri: null, fileKey: null, isUploading: false };
                 setPhotos(newPhotos);
+                // Remove from upload in progress
+                setUploadInProgress(prev => {
+                    const next = new Set(prev);
+                    next.delete(index);
+                    return next;
+                });
             }
         }
     };
@@ -282,13 +299,23 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
 
             // 3. Update photo data with file key (success)
             console.log('✅ Upload completed successfully, setting fileKey:', file_key);
-            const newPhotos = [...photos];
-            newPhotos[index] = {
-                uri: localUri,
-                fileKey: file_key,
-                isUploading: false,
-            };
-            setPhotos(newPhotos);
+            setPhotos(prevPhotos => {
+                const newPhotos = [...prevPhotos];
+                newPhotos[index] = {
+                    uri: localUri,
+                    fileKey: file_key,
+                    isUploading: false,
+                };
+                return newPhotos;
+            });
+            
+            // Remove from upload in progress
+            setUploadInProgress(prev => {
+                const next = new Set(prev);
+                next.delete(index);
+                return next;
+            });
+            
             console.log('✅ Photo state updated, ready for media record creation');
         } catch (error: any) {
             console.error('Upload error details:', {
@@ -305,18 +332,43 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
             );
 
             // Reset photo state
-            const newPhotos = [...photos];
-            newPhotos[index] = { uri: null, fileKey: null, isUploading: false };
-            setPhotos(newPhotos);
+            setPhotos(prevPhotos => {
+                const newPhotos = [...prevPhotos];
+                newPhotos[index] = { uri: null, fileKey: null, isUploading: false };
+                return newPhotos;
+            });
+            
+            // Remove from upload in progress
+            setUploadInProgress(prev => {
+                const next = new Set(prev);
+                next.delete(index);
+                return next;
+            });
         }
     };
 
     const handleNext = async () => {
+        // Prevent multiple simultaneous calls
+        if (isSubmitting || hasCalledUploadComplete) {
+            console.warn('⚠️ Already submitting or upload-complete already called');
+            return;
+        }
+
         // Count photos that are selected (either uploaded or uploading)
         const selectedPhotos = photos.filter(p => p.uri !== null);
 
         if (selectedPhotos.length < 2) {
             Alert.alert('More Photos Needed', 'Please select at least 2 photos to continue.');
+            return;
+        }
+
+        // Check if any photos are still uploading
+        const stillUploading = photos.filter(p => p.uri !== null && p.isUploading);
+        if (stillUploading.length > 0) {
+            Alert.alert(
+                'Photos Still Uploading',
+                `Please wait for ${stillUploading.length} photo(s) to finish uploading before continuing.`
+            );
             return;
         }
 
@@ -332,6 +384,7 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
 
             if (uploadedPhotos.length === 0) {
                 Alert.alert('No Photos', 'Please wait for photos to finish uploading.');
+                setIsSubmitting(false);
                 return;
             }
 
@@ -343,76 +396,47 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                 media_type: 'photo' as const,
             }));
 
+            // Mark as called to prevent duplicates
+            setHasCalledUploadComplete(true);
+
             console.log('📤 Calling upload-complete endpoint with batch:', photosBatch);
-            const uploadCompleteResult = await UserService.uploadComplete(photosBatch);
-            console.log('✅ Upload-complete response:', uploadCompleteResult);
-
-            // Extract batch_id from response (axios wraps in .data)
-            const batchId = uploadCompleteResult?.batch_id || uploadCompleteResult?.data?.batch_id;
-            
-            if (!batchId) {
-                console.warn('⚠️ No batch_id in response, but continuing...');
-            }
-            
-            // Navigate to status screen - use navigation from props or get it from navigation context
-            const navParams = {
-                batchId: batchId,
-                source: 'onboarding',
-            };
-            
-            console.log('🧭 Navigating to PhotoStatus with params:', navParams);
-            
-            // Use a small delay to ensure state updates are complete
-            setTimeout(() => {
-                try {
-                    // Try to get navigation from parent navigator if available
-                    const nav = navigation || (navigation as any)?.parent || (navigation as any)?.navigation;
-                    
-                    if (nav?.navigate) {
-                        console.log('✅ Using navigation.navigate...');
-                        nav.navigate('PhotoStatus', navParams);
-                    } else if (nav?.replace) {
-                        console.log('✅ Using navigation.replace...');
-                        nav.replace('PhotoStatus', navParams);
-                    } else if (nav?.push) {
-                        console.log('✅ Using navigation.push...');
-                        nav.push('PhotoStatus', navParams);
-                    } else {
-                        console.error('❌ No navigation method available');
-                        // Fallback: show alert and let user manually navigate
-                        Alert.alert(
-                            'Photos Uploaded',
-                            'Your photos are being reviewed. You can check their status in your profile.',
-                            [
-                                {
-                                    text: 'OK',
-                                    onPress: () => {
-                                        // Try to navigate to profile or back
-                                        if (nav?.goBack) {
-                                            nav.goBack();
-                                        }
-                                    }
-                                }
-                            ]
-                        );
-                    }
-                } catch (navError) {
-                    console.error('❌ Navigation error:', navError);
+            let uploadCompleteResult;
+            try {
+                uploadCompleteResult = await UserService.uploadComplete(photosBatch);
+                console.log('✅ Upload-complete response:', uploadCompleteResult);
+            } catch (error: any) {
+                // Handle 429 rate limit error
+                if (error?.response?.status === 429) {
+                    const errorMessage = error?.response?.data?.message || 'Too many requests. Please try again later.';
                     Alert.alert(
-                        'Photos Uploaded',
-                        'Your photos are being reviewed. Please check your profile to see their status.',
-                        [{ text: 'OK' }]
+                        'Rate Limit Exceeded',
+                        errorMessage + '\n\nYou can continue with your current photos or try again later.',
+                        [
+                            {
+                                text: 'Continue Anyway',
+                                onPress: () => {
+                                    // Continue navigation even if rate limited
+                                    navigateToStatusScreen(uploadCompleteResult);
+                                }
+                            },
+                            {
+                                text: 'OK',
+                                style: 'cancel'
+                            }
+                        ]
                     );
+                    setIsSubmitting(false);
+                    setHasCalledUploadComplete(false); // Allow retry
+                    return;
                 }
-            }, 100);
-
-            // Photos still uploading will continue in background
-            const stillUploading = photos.filter(p => p.uri !== null && p.fileKey === null && p.isUploading);
-            if (stillUploading.length > 0) {
-                console.log(`ℹ️  ${stillUploading.length} photos still uploading in background`);
+                throw error; // Re-throw other errors
             }
+
+            // Navigate to status screen
+            navigateToStatusScreen(uploadCompleteResult);
         } catch (error: any) {
             console.error('Submit error:', error);
+            setHasCalledUploadComplete(false); // Allow retry on error
             Alert.alert(
                 'Error',
                 'Failed to save photos. Please try again.\n\n' + (error?.message || 'Unknown error')
@@ -420,6 +444,67 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const navigateToStatusScreen = (uploadCompleteResult: any) => {
+        // Extract batch_id from response (axios wraps in .data)
+        const batchId = uploadCompleteResult?.batch_id || uploadCompleteResult?.data?.batch_id;
+        
+        if (!batchId) {
+            console.warn('⚠️ No batch_id in response, but continuing...');
+        }
+        
+        // Navigate to status screen - use navigation from props or get it from navigation context
+        const navParams = {
+            batchId: batchId,
+            source: 'onboarding',
+        };
+        
+        console.log('🧭 Navigating to PhotoStatus with params:', navParams);
+        
+        // Use a small delay to ensure state updates are complete
+        setTimeout(() => {
+            try {
+                // Try to get navigation from parent navigator if available
+                const nav = navigation || (navigation as any)?.parent || (navigation as any)?.navigation;
+                
+                if (nav?.navigate) {
+                    console.log('✅ Using navigation.navigate...');
+                    nav.navigate('PhotoStatus', navParams);
+                } else if (nav?.replace) {
+                    console.log('✅ Using navigation.replace...');
+                    nav.replace('PhotoStatus', navParams);
+                } else if (nav?.push) {
+                    console.log('✅ Using navigation.push...');
+                    nav.push('PhotoStatus', navParams);
+                } else {
+                    console.error('❌ No navigation method available');
+                    // Fallback: show alert and let user manually navigate
+                    Alert.alert(
+                        'Photos Uploaded',
+                        'Your photos are being reviewed. You can check their status in your profile.',
+                        [
+                            {
+                                text: 'OK',
+                                onPress: () => {
+                                    // Try to navigate to profile or back
+                                    if (nav?.goBack) {
+                                        nav.goBack();
+                                    }
+                                }
+                            }
+                        ]
+                    );
+                }
+            } catch (navError) {
+                console.error('❌ Navigation error:', navError);
+                Alert.alert(
+                    'Photos Uploaded',
+                    'Your photos are being reviewed. Please check your profile to see their status.',
+                    [{ text: 'OK' }]
+                );
+            }
+        }, 100);
     };
 
     const PhotoBox = ({ index, photo }: { index: number, photo: PhotoData }) => (
