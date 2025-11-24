@@ -1,20 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, View, Text, Platform } from 'react-native';
-import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
+import { Platform } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { COLORS } from './src/theme/colors';
 
-// Placeholder Screens (We will move these to separate files later)
-const SplashScreen = () => (
-    <View style={styles.container}>
-        <Text style={styles.title}>Lomi Social 💚</Text>
-        <Text style={styles.subtitle}>Find your Lomi in Ethiopia</Text>
-    </View>
-);
-import { WelcomeScreen } from './src/screens/onboarding/WelcomeScreen';
 import { OnboardingNavigator } from './src/navigation/OnboardingNavigator';
 import { AuthGuard } from './src/components/AuthGuard';
 
@@ -27,12 +19,11 @@ import { PayoutThankYouScreen } from './src/screens/payout/PayoutThankYouScreen'
 import { LeaderboardScreen } from './src/screens/payout/LeaderboardScreen';
 import { AddVibeScreen } from './src/screens/explore/AddVibeScreen';
 import { ExploreDetailScreen } from './src/screens/explore/ExploreDetailScreen';
+import { LandingPage } from './src/screens/LandingPage';
 
 const Stack = createStackNavigator();
 
 export default function App() {
-    const navigationRef = useRef<NavigationContainerRef<any>>(null);
-
     useEffect(() => {
         // Inject Telegram WebApp script for Web platform
         if (Platform.OS === 'web' && typeof document !== 'undefined') {
@@ -100,8 +91,9 @@ export default function App() {
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
-                <AuthGuard navigationRef={navigationRef}>
-                    <NavigationContainer ref={navigationRef} theme={{
+                <AuthGuard>
+                    <NavigationContainer
+                        theme={{
                         dark: true,
                         colors: {
                             primary: COLORS.primary,
@@ -114,6 +106,7 @@ export default function App() {
                     }}>
                         <StatusBar style="light" />
                         <Stack.Navigator
+                            initialRouteName="Landing"
                             screenOptions={{
                                 headerShown: false,
                                 cardStyleInterpolator: ({ current, next, layouts }) => {
@@ -160,7 +153,7 @@ export default function App() {
                                 },
                             }}
                         >
-                            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+                            <Stack.Screen name="Landing" component={LandingPage} />
                             <Stack.Screen name="Onboarding" component={OnboardingNavigator} />
                             <Stack.Screen name="Main" component={MainTabNavigator} />
                             <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
@@ -178,22 +171,3 @@ export default function App() {
         </GestureHandlerRootView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: COLORS.background,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: COLORS.primary,
-        marginBottom: 10,
-    },
-    subtitle: {
-        fontSize: 18,
-        color: COLORS.textSecondary,
-    },
-});

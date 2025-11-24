@@ -31,6 +31,7 @@ func SetupRoutes(app *fiber.App) {
 
 	// Telegram Mini App login (initData method) - Auto-authenticates on app open
 	api.Post("/auth/telegram", authHandler.TelegramLogin)
+	api.Post("/auth/google", authHandler.GoogleLogin)
 
 	api.Post("/auth/refresh", handlers.RefreshToken) // TODO: Implement
 
@@ -115,7 +116,7 @@ func SetupRoutes(app *fiber.App) {
 	admin.Put("/reports/:id/review", handlers.ReviewReport)
 	admin.Get("/payouts/pending", handlers.GetPendingPayouts)
 	admin.Put("/payouts/:id/process", handlers.ProcessPayout)
-	
+
 	// Photo Moderation Monitoring (Phase 3)
 	admin.Get("/queue-stats", handlers.GetQueueStats)
 	admin.Get("/moderation/dashboard", handlers.GetModerationDashboard)

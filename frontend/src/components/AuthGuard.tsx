@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
-import { NavigationContainerRef } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { useAuthStore } from '../store/authStore';
-import { getTelegramInitData, isTelegramWebApp, getTelegramWebApp } from '../utils/telegram';
+import { getTelegramInitData, isTelegramWebApp } from '../utils/telegram';
 import { COLORS } from '../theme/colors';
 import { Button } from './ui/Button';
 
@@ -17,22 +16,21 @@ import { Button } from './ui/Button';
  */
 export const AuthGuard: React.FC<{
     children: React.ReactNode;
-    navigationRef?: React.RefObject<NavigationContainerRef<any>>;
-}> = ({ children, navigationRef }) => {
-    const {
-        isAuthenticated,
-        isLoading,
-        user,
-        login,
-        loadTokens
-    } = useAuthStore();
+}> = ({ children }) => {
+    const { isAuthenticated, isLoading, login, loadTokens } = useAuthStore();
 
     const [isCheckingAuth, setIsCheckingAuth] = useState(true);
     const [authError, setAuthError] = useState<string | null>(null);
+    const [isTelegramEnv, setIsTelegramEnv] = useState<boolean>(isTelegramWebApp());
+
+    useEffect(() => {
+        setIsTelegramEnv(isTelegramWebApp());
+    }, []);
 
     useEffect(() => {
         initializeAuth();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isTelegramEnv]);
 
     const initializeAuth = async () => {
         try {
@@ -43,21 +41,19 @@ export const AuthGuard: React.FC<{
             const hasStoredTokens = await loadTokens();
             if (hasStoredTokens) {
                 console.log('✅ User already authenticated via stored tokens');
-                handlePostAuthRouting();
                 setIsCheckingAuth(false);
                 return;
             }
 
             // Step 2: Auto-authenticate using Telegram Mini App initData
             // Telegram automatically injects initDataUnsafe.user when Mini App opens
-            if (isTelegramWebApp()) {
+            if (isTelegramEnv) {
                 const initData = getTelegramInitData();
                 if (initData) {
                     console.log('🔐 Auto-authenticating with Telegram initData...');
                     try {
                         await login(initData);
                         console.log('✅ Auto-authentication successful');
-                        handlePostAuthRouting();
                         setIsCheckingAuth(false);
                         return;
                     } catch (loginError: any) {
@@ -74,9 +70,8 @@ export const AuthGuard: React.FC<{
                 }
             }
 
-            // Step 3: Not in Telegram - show error
-            console.warn('⚠️ App not opened from Telegram');
-            setAuthError('Please open this app from Telegram');
+            // Step 3: Not in Telegram - allow UI to handle web login
+            console.log('🌐 Running outside Telegram - awaiting manual login');
             setIsCheckingAuth(false);
 
         } catch (error: any) {
@@ -84,40 +79,6 @@ export const AuthGuard: React.FC<{
             setAuthError(error?.response?.data?.error || error?.message || 'Authentication failed');
             setIsCheckingAuth(false);
         }
-    };
-
-    const handlePostAuthRouting = () => {
-        const currentUser = useAuthStore.getState().user;
-
-        if (!currentUser) {
-            console.warn('⚠️ No user data available after auth');
-            return;
-        }
-
-        // Wait a bit for navigation to be ready
-        setTimeout(() => {
-            if (!navigationRef?.current) {
-                console.warn('⚠️ Navigation not ready yet');
-                return;
-            }
-
-            // Check onboarding status from user object
-            const onboardingCompleted = currentUser.onboarding_completed === true;
-
-            if (onboardingCompleted) {
-                // User has completed onboarding, go to main app
-                navigationRef.current.reset({
-                    index: 0,
-                    routes: [{ name: 'Main' }],
-                });
-            } else {
-                // User hasn't completed onboarding, go to onboarding navigator
-                navigationRef.current.reset({
-                    index: 0,
-                    routes: [{ name: 'Onboarding' }],
-                });
-            }
-        }, 100);
     };
 
     const handleRetry = () => {
@@ -138,7 +99,7 @@ export const AuthGuard: React.FC<{
     }
 
     // Error Screen (if not in Telegram)
-    if (authError && !isAuthenticated) {
+    if (authError && isTelegramEnv && !isAuthenticated) {
         return (
             <View style={styles.container}>
                 <View style={styles.errorContent}>

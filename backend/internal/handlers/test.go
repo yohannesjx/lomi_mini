@@ -217,7 +217,7 @@ func TestGetJWT(c *fiber.Ctx) error {
 		"user": fiber.Map{
 			"id":          user.ID,
 			"name":        user.Name,
-			"telegram_id": user.TelegramID,
+			"telegram_id": utils.TelegramIDValue(user.TelegramID),
 			"is_verified": user.IsVerified,
 		},
 		"expires_in": 86400, // 24 hours in seconds

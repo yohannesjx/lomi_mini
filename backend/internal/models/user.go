@@ -71,10 +71,13 @@ type User struct {
 	ID uuid.UUID `gorm:"type:uuid;default:uuid_generate_v4();primaryKey"`
 
 	// Telegram Integration
-	TelegramID        int64  `gorm:"uniqueIndex;not null"`
+	TelegramID        *int64 `gorm:"index"`
 	TelegramUsername  string `gorm:"size:255"`
 	TelegramFirstName string `gorm:"size:255"`
 	TelegramLastName  string `gorm:"size:255"`
+
+	// Contact
+	Email string `gorm:"size:255"`
 
 	// Profile Information
 	Name             string           `gorm:"size:255;not null"`
@@ -129,6 +132,9 @@ type User struct {
 
 	// Tutorial & First-Time Experience
 	HasSeenSwipeTutorial bool `gorm:"-"` // Ignore this field in GORM until migration is run
+
+	// Auth Providers
+	AuthProviders []AuthProvider `gorm:"foreignKey:UserID"`
 
 	// Timestamps
 	CreatedAt time.Time      `gorm:"type:timestamptz;default:now()"`

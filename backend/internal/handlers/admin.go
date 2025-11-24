@@ -116,10 +116,10 @@ func ProcessPayout(c *fiber.Ctx) error {
 
 	payoutID := c.Params("id")
 	var req struct {
-		Action            string `json:"action"` // "approve", "reject"
-		PaymentReference  string `json:"payment_reference,omitempty"`
-		RejectionReason   string `json:"rejection_reason,omitempty"`
-		AdminNotes        string `json:"admin_notes,omitempty"`
+		Action           string `json:"action"` // "approve", "reject"
+		PaymentReference string `json:"payment_reference,omitempty"`
+		RejectionReason  string `json:"rejection_reason,omitempty"`
+		AdminNotes       string `json:"admin_notes,omitempty"`
 	}
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
@@ -194,20 +194,20 @@ func GetQueueStats(c *fiber.Ctx) error {
 		Failed   int64
 		Total    int64
 	}
-	
+
 	last24h := time.Now().Add(-24 * time.Hour)
 	database.DB.Model(&models.Media{}).
 		Where("moderated_at > ? AND moderation_status = ?", last24h, "approved").
 		Count(&last24hStats.Approved)
-	
+
 	database.DB.Model(&models.Media{}).
 		Where("moderated_at > ? AND moderation_status = ?", last24h, "rejected").
 		Count(&last24hStats.Rejected)
-	
+
 	database.DB.Model(&models.Media{}).
 		Where("moderated_at > ? AND moderation_status = ?", last24h, "failed").
 		Count(&last24hStats.Failed)
-	
+
 	last24hStats.Total = last24hStats.Approved + last24hStats.Rejected + last24hStats.Failed
 
 	// Get rejection reasons breakdown (last 24h)
@@ -232,10 +232,10 @@ func GetQueueStats(c *fiber.Ctx) error {
 			"pending_media": pendingCount,
 		},
 		"last_24h": fiber.Map{
-			"total":    last24hStats.Total,
-			"approved": last24hStats.Approved,
-			"rejected": last24hStats.Rejected,
-			"failed":   last24hStats.Failed,
+			"total":             last24hStats.Total,
+			"approved":          last24hStats.Approved,
+			"rejected":          last24hStats.Rejected,
+			"failed":            last24hStats.Failed,
 			"rejection_reasons": reasonsMap,
 		},
 		"timestamp": time.Now(),
@@ -291,11 +291,11 @@ func GetModerationDashboard(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"media":      mediaList,
+		"media": mediaList,
 		"pagination": fiber.Map{
-			"page":       page,
-			"limit":      limit,
-			"total":      totalCount,
+			"page":        page,
+			"limit":       limit,
+			"total":       totalCount,
 			"total_pages": (int(totalCount) + limit - 1) / limit,
 		},
 		"filters": fiber.Map{
@@ -303,4 +303,3 @@ func GetModerationDashboard(c *fiber.Ctx) error {
 		},
 	})
 }
-

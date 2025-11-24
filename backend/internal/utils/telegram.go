@@ -100,3 +100,19 @@ func ValidateTelegramInitData(initData string, botToken string, expiresIn ...tim
 
 	return &user, nil
 }
+
+// TelegramIDValue safely dereferences an optional Telegram ID pointer.
+func TelegramIDValue(id *int64) int64 {
+	if id == nil {
+		return 0
+	}
+	return *id
+}
+
+// TelegramIDString returns a string representation for logging.
+func TelegramIDString(id *int64) string {
+	if id == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%d", *id)
+}

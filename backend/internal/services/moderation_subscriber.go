@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"lomi-backend/internal/database"
 	"lomi-backend/internal/models"
 	"lomi-backend/internal/queue"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -64,7 +64,7 @@ func handleModerationResult(payload string) {
 		return
 	}
 
-	log.Printf("📥 Received moderation result: batch_id=%s, approved=%d, rejected=%d", 
+	log.Printf("📥 Received moderation result: batch_id=%s, approved=%d, rejected=%d",
 		result.BatchID, result.Summary.Approved, result.Summary.Rejected)
 
 	batchID, err := uuid.Parse(result.BatchID)
@@ -112,9 +112,9 @@ func handleModerationResult(payload string) {
 
 		// Log detailed moderation result with scores
 		scoresJSON, _ := json.Marshal(photoResult.Scores)
-		log.Printf("📊 Moderation Result: media_id=%s, status=%s, reason=%s, scores=%s", 
+		log.Printf("📊 Moderation Result: media_id=%s, status=%s, reason=%s, scores=%s",
 			mediaID, photoResult.Status, photoResult.Reason, string(scoresJSON))
-		
+
 		log.Printf("✅ Updated media record: media_id=%s, status=%s", mediaID, photoResult.Status)
 	}
 
@@ -126,10 +126,10 @@ func sendSmartPush(result queue.ModerationResult) {
 	// Check if we should send push (dedupe: max 1 per 10 seconds per user)
 	userIDStr := result.UserID
 	now := time.Now()
-	
+
 	if lastPush, exists := pushDedupeMap[userIDStr]; exists {
 		if now.Sub(lastPush) < pushDedupeTTL {
-			log.Printf("⏭️ Skipping push (dedupe): user_id=%s, last_push=%v ago", 
+			log.Printf("⏭️ Skipping push (dedupe): user_id=%s, last_push=%v ago",
 				userIDStr, now.Sub(lastPush))
 			return
 		}
@@ -159,7 +159,7 @@ func sendSmartPush(result queue.ModerationResult) {
 		if len(reasons) > 0 {
 			reasonText = reasons[0] // Use first reason
 		}
-		message = fmt.Sprintf("✅ %d/%d ፎቶዎች ዝግጁ ናቸው, %s\n\n%d/%d photos approved, %s", 
+		message = fmt.Sprintf("✅ %d/%d ፎቶዎች ዝግጁ ናቸው, %s\n\n%d/%d photos approved, %s",
 			approved, total, reasonText, approved, total, reasonText)
 	}
 
@@ -170,7 +170,7 @@ func sendSmartPush(result queue.ModerationResult) {
 			if err := NotificationSvc.SendTelegramMessage(result.TelegramID, message); err != nil {
 				log.Printf("❌ Failed to send Telegram push: %v", err)
 			} else {
-				log.Printf("✅ Sent push notification: user_id=%s, telegram_id=%d", 
+				log.Printf("✅ Sent push notification: user_id=%s, telegram_id=%d",
 					userIDStr, result.TelegramID)
 			}
 		}
@@ -189,4 +189,3 @@ func getReasonText(reason string) string {
 	}
 	return reason
 }
-

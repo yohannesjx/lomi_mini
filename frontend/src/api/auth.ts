@@ -48,6 +48,22 @@ export const AuthService = {
         }
     },
 
+    googleLogin: async (idToken: string): Promise<AuthResponse> => {
+        try {
+            const response = await api.post<AuthResponse>('/auth/google', {
+                id_token: idToken,
+            });
+            return response.data;
+        } catch (error: any) {
+            console.error('❌ Google login failed:', {
+                message: error?.message,
+                status: error?.response?.status,
+                data: error?.response?.data,
+            });
+            throw error;
+        }
+    },
+
     telegramWidgetLogin: async (authData: {
         id: string;
         first_name: string;

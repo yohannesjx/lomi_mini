@@ -45,9 +45,12 @@ type Config struct {
 	// Telegram
 	TelegramBotToken string
 
+	// Google OAuth
+	GoogleClientID string
+
 	// Push Notifications
-	OneSignalAppID   string
-	OneSignalAPIKey  string
+	OneSignalAppID    string
+	OneSignalAPIKey   string
 	FirebaseServerKey string
 }
 
@@ -90,7 +93,9 @@ func LoadConfig() *Config {
 
 		TelegramBotToken: getEnv("TELEGRAM_BOT_TOKEN", ""),
 
-		OneSignalAppID:   getEnv("ONESIGNAL_APP_ID", ""),
+		GoogleClientID: getEnv("GOOGLE_CLIENT_ID", ""),
+
+		OneSignalAppID:    getEnv("ONESIGNAL_APP_ID", ""),
 		OneSignalAPIKey:   getEnv("ONESIGNAL_API_KEY", ""),
 		FirebaseServerKey: getEnv("FIREBASE_SERVER_KEY", ""),
 	}

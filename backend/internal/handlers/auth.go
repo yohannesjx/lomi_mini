@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -20,6 +22,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	initdata "github.com/telegram-mini-apps/init-data-golang"
+	"google.golang.org/api/idtoken"
 	"gorm.io/gorm"
 )
 
@@ -186,84 +189,86 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 			if checkResult.Error == nil {
 				// User was created between our check and now, use existing user
 				user = existingUser
-				log.Printf("✅ User already exists (race condition): ID=%s, TelegramID=%d", user.ID, user.TelegramID)
+				log.Printf("✅ User already exists (race condition): ID=%s, TelegramID=%s",
+					user.ID, utils.TelegramIDString(user.TelegramID))
 			} else if checkResult.Error == gorm.ErrRecordNotFound {
 				// Create new user with required fields
-			// Use full name from Telegram (first_name + last_name)
-			fullName := strings.TrimSpace(tgUser.FirstName + " " + tgUser.LastName)
-			if fullName == "" {
-				fullName = "User" // Fallback if name is empty
-			}
+				// Use full name from Telegram (first_name + last_name)
+				fullName := strings.TrimSpace(tgUser.FirstName + " " + tgUser.LastName)
+				if fullName == "" {
+					fullName = "User" // Fallback if name is empty
+				}
 
-			// Initialize JSON fields
-			languages := models.JSONStringArray{}
-			interests := models.JSONStringArray{}
-			preferences := models.JSONMap{}
+				// Initialize JSON fields
+				languages := models.JSONStringArray{}
+				interests := models.JSONStringArray{}
+				preferences := models.JSONMap{}
 
-			// Create user with minimal required fields for Telegram authentication
-			// Don't set profile fields (name, age, gender) - user will fill them in onboarding
-			user = models.User{
-				TelegramID:        tgUser.ID,
-				TelegramUsername:  tgUser.Username,
-				TelegramFirstName: tgUser.FirstName,
-				TelegramLastName:  tgUser.LastName,
+				// Create user with minimal required fields for Telegram authentication
+				// Don't set profile fields (name, age, gender) - user will fill them in onboarding
+				telegramID := tgUser.ID
+				user = models.User{
+					TelegramID:        &telegramID,
+					TelegramUsername:  tgUser.Username,
+					TelegramFirstName: tgUser.FirstName,
+					TelegramLastName:  tgUser.LastName,
 
-				Name:               "User", // Temporary placeholder - will be updated in onboarding
-				Age:                18,     // Temporary - will be updated in onboarding
-				Gender:             models.GenderOther, // Temporary - will be updated in onboarding
-				City:               "Not Set",
-				RelationshipGoal:   models.GoalDating,
-				Religion:           models.ReligionNone,
-				VerificationStatus: models.VerificationPending,
-				IsActive:           true,
-				IsVerified:         false,
-				Languages:          languages,
-				Interests:          interests,
-				Preferences:        preferences,
-				CoinBalance:        0,
-				GiftBalance:        0.0,
-			}
+					Name:               "User",             // Temporary placeholder - will be updated in onboarding
+					Age:                18,                 // Temporary - will be updated in onboarding
+					Gender:             models.GenderOther, // Temporary - will be updated in onboarding
+					City:               "Not Set",
+					RelationshipGoal:   models.GoalDating,
+					Religion:           models.ReligionNone,
+					VerificationStatus: models.VerificationPending,
+					IsActive:           true,
+					IsVerified:         false,
+					Languages:          languages,
+					Interests:          interests,
+					Preferences:        preferences,
+					CoinBalance:        0,
+					GiftBalance:        0.0,
+				}
 
-			// Try to create user
-			createErr := database.DB.Create(&user).Error
-			if createErr != nil {
-				log.Printf("❌ Failed to create user: %v", createErr)
-				log.Printf("❌ Error type: %T", createErr)
-				log.Printf("❌ User data: TelegramID=%d, Name=%s, Age=%d, Gender=%s, City=%s, Religion=%s, VerificationStatus=%s",
-					user.TelegramID, user.Name, user.Age, user.Gender, user.City, user.Religion, user.VerificationStatus)
-				
-				// Check for duplicate key error (user already exists - race condition)
-				errStr := strings.ToLower(createErr.Error())
-				if strings.Contains(errStr, "duplicate key") || 
-				   strings.Contains(errStr, "unique constraint") ||
-				   strings.Contains(errStr, "already exists") {
-					log.Printf("⚠️ User already exists (race condition), fetching existing user...")
-					// Try to fetch the existing user
-					var existingUser models.User
-					if fetchErr := database.DB.Where("telegram_id = ?", tgUser.ID).First(&existingUser).Error; fetchErr == nil {
-						log.Printf("✅ Found existing user: ID=%s", existingUser.ID)
-						user = existingUser // Use existing user
+				// Try to create user
+				createErr := database.DB.Create(&user).Error
+				if createErr != nil {
+					log.Printf("❌ Failed to create user: %v", createErr)
+					log.Printf("❌ Error type: %T", createErr)
+					log.Printf("❌ User data: TelegramID=%s, Name=%s, Age=%d, Gender=%s, City=%s, Religion=%s, VerificationStatus=%s",
+						utils.TelegramIDString(user.TelegramID), user.Name, user.Age, user.Gender, user.City, user.Religion, user.VerificationStatus)
+
+					// Check for duplicate key error (user already exists - race condition)
+					errStr := strings.ToLower(createErr.Error())
+					if strings.Contains(errStr, "duplicate key") ||
+						strings.Contains(errStr, "unique constraint") ||
+						strings.Contains(errStr, "already exists") {
+						log.Printf("⚠️ User already exists (race condition), fetching existing user...")
+						// Try to fetch the existing user
+						var existingUser models.User
+						if fetchErr := database.DB.Where("telegram_id = ?", tgUser.ID).First(&existingUser).Error; fetchErr == nil {
+							log.Printf("✅ Found existing user: ID=%s", existingUser.ID)
+							user = existingUser // Use existing user
+						} else {
+							log.Printf("❌ Could not fetch existing user: %v", fetchErr)
+							return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+								"error":       "Could not create or find user",
+								"details":     createErr.Error(),
+								"fetch_error": fetchErr.Error(),
+							})
+						}
 					} else {
-						log.Printf("❌ Could not fetch existing user: %v", fetchErr)
+						// Return detailed error for other database errors
+						log.Printf("❌ Database error details: %+v", createErr)
 						return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-							"error":   "Could not create or find user",
+							"error":   "Could not create user",
 							"details": createErr.Error(),
-							"fetch_error": fetchErr.Error(),
+							"debug": fmt.Sprintf("TelegramID: %s, Name: %s, ErrorType: %T",
+								utils.TelegramIDString(user.TelegramID), user.Name, createErr),
 						})
 					}
 				} else {
-					// Return detailed error for other database errors
-					log.Printf("❌ Database error details: %+v", createErr)
-					return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-						"error":   "Could not create user",
-						"details": createErr.Error(),
-						"debug": fmt.Sprintf("TelegramID: %d, Name: %s, ErrorType: %T", 
-							user.TelegramID, user.Name, createErr),
-					})
+					log.Printf("✅ Created new user: ID=%s, TelegramID=%s", user.ID, utils.TelegramIDString(user.TelegramID))
 				}
-			} else {
-				log.Printf("✅ Created new user: ID=%s, TelegramID=%d", user.ID, user.TelegramID)
-			}
 
 				// Save profile photo if available (only for newly created users)
 				if user.ID != uuid.Nil && tgUser.PhotoURL != "" {
@@ -307,47 +312,176 @@ func (h *AuthHandler) TelegramLogin(c *fiber.Ctx) error {
 		}
 	}
 
-	// 4. Generate JWT Tokens
-	if h.cfg.JWTSecret == "" {
-		log.Printf("❌ JWTSecret is not configured")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "Server configuration error",
-			"details": "JWT secret is not configured",
+	// Ensure auth_providers entry exists for Telegram
+	if err := upsertAuthProvider(database.DB, user.ID, "telegram", fmt.Sprintf("%d", tgUser.ID), user.Email); err != nil {
+		log.Printf("⚠️ Failed to upsert Telegram auth provider: %v", err)
+	}
+
+	return h.respondWithAuthTokens(c, &user, "Telegram")
+}
+
+// GoogleLogin handles Firebase/Google Sign-In tokens for Web/PWA users
+func (h *AuthHandler) GoogleLogin(c *fiber.Ctx) error {
+	var req struct {
+		IDToken string `json:"id_token"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	req.IDToken = strings.TrimSpace(req.IDToken)
+	if req.IDToken == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "id_token is required",
 		})
 	}
 
-	log.Printf("🔑 Generating JWT tokens for user ID: %s", user.ID)
-	tokens, err := utils.CreateToken(user.ID, h.cfg.JWTSecret)
-	if err != nil {
-		log.Printf("❌ Failed to generate tokens: %v", err)
-		log.Printf("❌ Error type: %T", err)
-		log.Printf("❌ User ID: %s, JWT Secret length: %d", user.ID, len(h.cfg.JWTSecret))
+	if h.cfg.GoogleClientID == "" {
+		log.Printf("❌ GoogleClientID is not configured")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "Could not generate tokens",
+			"error":   "Server configuration error",
+			"details": "Google client ID is not configured",
+		})
+	}
+
+	payload, err := idtoken.Validate(context.Background(), req.IDToken, h.cfg.GoogleClientID)
+	if err != nil {
+		log.Printf("❌ Google token validation failed: %v", err)
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error":   "Invalid Google token",
 			"details": err.Error(),
 		})
 	}
-	log.Printf("✅ JWT tokens generated successfully")
 
-	// 5. Check onboarding status
-	hasProfile := user.City != "" && user.City != "Not Set"
-
-	// 6. Return Response
-	log.Printf("✅ Login successful for user ID: %s, TelegramID: %d, OnboardingStep: %d, Completed: %v",
-		user.ID, user.TelegramID, user.OnboardingStep, user.OnboardingCompleted)
-	response := fiber.Map{
-		"access_token":  tokens.AccessToken,
-		"refresh_token": tokens.RefreshToken,
-		"user": fiber.Map{
-			"id":                   user.ID,
-			"name":                 user.Name,
-			"is_verified":          user.IsVerified,
-			"has_profile":          hasProfile,
-			"onboarding_step":      user.OnboardingStep,
-			"onboarding_completed": user.OnboardingCompleted,
-		},
+	sub, _ := payload.Claims["sub"].(string)
+	if sub == "" {
+		sub = fmt.Sprint(payload.Claims["sub"])
 	}
-	return c.JSON(response)
+	if sub == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "Google token missing subject",
+		})
+	}
+
+	email, _ := payload.Claims["email"].(string)
+	email = strings.TrimSpace(strings.ToLower(email))
+
+	emailVerified := false
+	switch v := payload.Claims["email_verified"].(type) {
+	case bool:
+		emailVerified = v
+	case string:
+		emailVerified = strings.EqualFold(v, "true")
+	}
+
+	if email == "" || !emailVerified {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Verified email is required for Google authentication",
+		})
+	}
+
+	fullName, _ := payload.Claims["name"].(string)
+	if fullName == "" {
+		given, _ := payload.Claims["given_name"].(string)
+		family, _ := payload.Claims["family_name"].(string)
+		fullName = strings.TrimSpace(strings.Join([]string{given, family}, " "))
+	}
+	if fullName == "" && email != "" {
+		fullName = strings.Split(email, "@")[0]
+	}
+	if fullName == "" {
+		fullName = "Lomi Member"
+	}
+
+	photoURL, _ := payload.Claims["picture"].(string)
+
+	var user models.User
+
+	err = database.DB.Transaction(func(tx *gorm.DB) error {
+		// 1. Try to find by auth provider
+		existingUser, providerErr := findUserByAuthProvider(tx, "google", sub)
+		if providerErr == nil && existingUser != nil {
+			user = *existingUser
+			return nil
+		}
+		if providerErr != nil && !errors.Is(providerErr, gorm.ErrRecordNotFound) {
+			return providerErr
+		}
+
+		// 2. Try to find by email (merge account)
+		if user.ID == uuid.Nil {
+			var existing models.User
+			if err := tx.Where("LOWER(email) = LOWER(?)", email).First(&existing).Error; err == nil {
+				user = existing
+			} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+
+		// 3. Create new user if needed
+		if user.ID == uuid.Nil {
+			newUser := models.User{
+				Name:               fullName,
+				Email:              email,
+				Age:                18,
+				Gender:             models.GenderOther,
+				City:               "Not Set",
+				RelationshipGoal:   models.GoalDating,
+				Religion:           models.ReligionNone,
+				VerificationStatus: models.VerificationPending,
+				IsActive:           true,
+				IsVerified:         false,
+				Languages:          models.JSONStringArray{},
+				Interests:          models.JSONStringArray{},
+				Preferences:        models.JSONMap{},
+				CoinBalance:        0,
+				GiftBalance:        0.0,
+			}
+
+			if err := tx.Create(&newUser).Error; err != nil {
+				return err
+			}
+			user = newUser
+
+			// Save Google profile photo if available
+			if photoURL != "" {
+				media := models.Media{
+					UserID:       user.ID,
+					MediaType:    models.MediaTypePhoto,
+					URL:          photoURL,
+					DisplayOrder: 1,
+					IsApproved:   true,
+				}
+				if err := tx.Create(&media).Error; err != nil {
+					log.Printf("⚠️ Failed to save Google profile photo: %v", err)
+				}
+			}
+		} else if user.Email == "" {
+			if err := tx.Model(&user).Update("email", email).Error; err != nil {
+				return err
+			}
+			user.Email = email
+		}
+
+		// Ensure auth_providers entry exists
+		if err := upsertAuthProvider(tx, user.ID, "google", sub, email); err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		log.Printf("❌ Google login transaction failed: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Could not process Google login",
+			"details": err.Error(),
+		})
+	}
+
+	log.Printf("✅ Google login successful: user_id=%s email=%s", user.ID, email)
+	return h.respondWithAuthTokens(c, &user, "Google")
 }
 
 // RefreshToken handles token refresh
@@ -387,6 +521,92 @@ func RefreshToken(c *fiber.Ctx) error {
 		"access_token":  tokens.AccessToken,
 		"refresh_token": tokens.RefreshToken,
 	})
+}
+
+func (h *AuthHandler) respondWithAuthTokens(c *fiber.Ctx, user *models.User, source string) error {
+	if h.cfg.JWTSecret == "" {
+		log.Printf("❌ JWTSecret is not configured")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Server configuration error",
+			"details": "JWT secret is not configured",
+		})
+	}
+
+	tokens, err := utils.CreateToken(user.ID, h.cfg.JWTSecret)
+	if err != nil {
+		log.Printf("❌ Failed to generate tokens for %s login: %v", source, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "Could not generate tokens",
+			"details": err.Error(),
+		})
+	}
+
+	hasProfile := user.City != "" && user.City != "Not Set"
+
+	log.Printf("✅ %s auth success: user_id=%s telegram_id=%s onboarding_step=%d completed=%v",
+		source, user.ID, utils.TelegramIDString(user.TelegramID), user.OnboardingStep, user.OnboardingCompleted)
+
+	return c.JSON(fiber.Map{
+		"access_token":  tokens.AccessToken,
+		"refresh_token": tokens.RefreshToken,
+		"user": fiber.Map{
+			"id":                   user.ID,
+			"name":                 user.Name,
+			"is_verified":          user.IsVerified,
+			"has_profile":          hasProfile,
+			"onboarding_step":      user.OnboardingStep,
+			"onboarding_completed": user.OnboardingCompleted,
+		},
+	})
+}
+
+func findUserByAuthProvider(tx *gorm.DB, provider, providerID string) (*models.User, error) {
+	var authProvider models.AuthProvider
+	if err := tx.Where("provider = ? AND provider_id = ?", provider, providerID).First(&authProvider).Error; err != nil {
+		return nil, err
+	}
+
+	var user models.User
+	if err := tx.Where("id = ?", authProvider.UserID).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func upsertAuthProvider(tx *gorm.DB, userID uuid.UUID, provider, providerID, email string) error {
+	if provider == "" || providerID == "" {
+		return fmt.Errorf("provider information missing")
+	}
+
+	var existing models.AuthProvider
+	if err := tx.Where("provider = ? AND provider_id = ?", provider, providerID).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			entry := models.AuthProvider{
+				UserID:     userID,
+				Provider:   provider,
+				ProviderID: providerID,
+				Email:      email,
+				LinkedAt:   time.Now(),
+			}
+			return tx.Create(&entry).Error
+		}
+		return err
+	}
+
+	needsUpdate := false
+	if existing.UserID != userID {
+		existing.UserID = userID
+		needsUpdate = true
+	}
+	if email != "" && !strings.EqualFold(existing.Email, email) {
+		existing.Email = email
+		needsUpdate = true
+	}
+	if needsUpdate {
+		existing.LinkedAt = time.Now()
+		return tx.Save(&existing).Error
+	}
+	return nil
 }
 
 // TelegramWidgetLogin - REMOVED: No longer needed
@@ -531,9 +751,10 @@ func (h *AuthHandler) TelegramWidgetLogin_DEPRECATED(c *fiber.Ctx) error {
 
 			// Create user with minimal required fields for Telegram authentication
 			// All other fields will be filled during onboarding process
+			telegramID := tgUser.ID
 			user = models.User{
 				// Telegram Integration (required for auth)
-				TelegramID:        tgUser.ID,
+				TelegramID:        &telegramID,
 				TelegramUsername:  tgUser.Username,
 				TelegramFirstName: tgUser.FirstName,
 				TelegramLastName:  tgUser.LastName,
@@ -558,8 +779,8 @@ func (h *AuthHandler) TelegramWidgetLogin_DEPRECATED(c *fiber.Ctx) error {
 			if err := database.DB.Create(&user).Error; err != nil {
 				log.Printf("❌ Failed to create user (widget): %v", err)
 				log.Printf("❌ Error type: %T", err)
-				log.Printf("❌ User data: TelegramID=%d, Name=%s, Age=%d, Gender=%s, City=%s",
-					user.TelegramID, user.Name, user.Age, user.Gender, user.City)
+				log.Printf("❌ User data: TelegramID=%s, Name=%s, Age=%d, Gender=%s, City=%s",
+					utils.TelegramIDString(user.TelegramID), user.Name, user.Age, user.Gender, user.City)
 
 				// Check for specific database errors
 				if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "UNIQUE constraint") {
@@ -581,7 +802,7 @@ func (h *AuthHandler) TelegramWidgetLogin_DEPRECATED(c *fiber.Ctx) error {
 					})
 				}
 			} else {
-				log.Printf("✅ Created new user (widget): ID=%s, TelegramID=%d", user.ID, user.TelegramID)
+				log.Printf("✅ Created new user (widget): ID=%s, TelegramID=%s", user.ID, utils.TelegramIDString(user.TelegramID))
 			}
 		} else {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Database error"})

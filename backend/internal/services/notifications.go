@@ -7,6 +7,7 @@ import (
 	"log"
 	"lomi-backend/internal/database"
 	"lomi-backend/internal/models"
+	"lomi-backend/internal/utils"
 	"net/http"
 	"time"
 
@@ -50,8 +51,8 @@ func (ns *NotificationService) SendNotification(userID uuid.UUID, notificationTy
 	}
 
 	// Send Telegram Mini App silent push (if user is in Telegram)
-	if user.TelegramID > 0 {
-		if err := ns.sendTelegramPush(user.TelegramID, notificationType, title, body, data); err != nil {
+	if telegramID := utils.TelegramIDValue(user.TelegramID); telegramID > 0 {
+		if err := ns.sendTelegramPush(telegramID, notificationType, title, body, data); err != nil {
 			log.Printf("Failed to send Telegram push: %v", err)
 		}
 	}
