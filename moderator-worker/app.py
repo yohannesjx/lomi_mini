@@ -39,12 +39,12 @@ S3_BUCKET_PHOTOS = os.getenv('S3_BUCKET_PHOTOS', 'lomi-photos')
 QUEUE_NAME = 'photo_moderation_queue'
 RESULTS_CHANNEL = 'moderation_results'
 
-# Moderation thresholds (STRICT for safety)
+# Moderation thresholds (BALANCED - allow swimsuits, reject actual porn/nudity)
 BLUR_THRESHOLD = 120  # Laplacian variance
-NSFW_PORN_THRESHOLD = 0.25  # Very strict - reject if porn > 25%
-NSFW_SEXY_THRESHOLD = 0.40  # Strict - reject if sexy > 40%
-NSFW_HENTAI_THRESHOLD = 0.30  # Strict - reject if hentai > 30%
-NSFW_ANY_THRESHOLD = 0.20  # Reject if ANY NSFW category > 20% (safety net)
+NSFW_PORN_THRESHOLD = 0.50  # Reject if porn > 50% (actual explicit content)
+NSFW_SEXY_THRESHOLD = 0.70  # Reject if sexy > 70% (allow swimsuits which are typically 40-60%)
+NSFW_HENTAI_THRESHOLD = 0.50  # Reject if hentai > 50%
+NSFW_ANY_THRESHOLD = 0.45  # Safety net - reject if ANY category > 45% (allows swimsuits)
 
 # Initialize Redis
 redis_client = redis.Redis(
@@ -125,9 +125,9 @@ def check_face_opencv(image_bytes: bytes) -> dict:
             return {"has_face": False, "face_count": 0}
         
         height, width = img.shape[:2]
-        # More reasonable face size limits - allow smaller faces but validate them
-        min_face_size = max(30, int(min(width, height) * 0.05))  # At least 5% of smaller dimension (allows smaller faces)
-        max_face_size = int(min(width, height) * 0.9)  # Max 90% of smaller dimension
+        # More lenient face size limits - allow smaller faces
+        min_face_size = max(25, int(min(width, height) * 0.03))  # At least 3% of smaller dimension (more lenient)
+        max_face_size = int(min(width, height) * 0.95)  # Max 95% of smaller dimension
         
         # Convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -135,17 +135,17 @@ def check_face_opencv(image_bytes: bytes) -> dict:
         # Load face cascade (OpenCV includes this)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         
-        # Balanced parameters - not too strict, not too lenient
+        # More lenient parameters - less aggressive detection
         faces = face_cascade.detectMultiScale(
             gray, 
-            scaleFactor=1.2,  # Balanced sensitivity
-            minNeighbors=4,   # Reasonable strictness (was 6, too strict)
+            scaleFactor=1.15,  # More sensitive (smaller steps = more detections)
+            minNeighbors=3,   # Less strict (was 4, now 3 - allows more faces)
             minSize=(min_face_size, min_face_size),
             maxSize=(max_face_size, max_face_size),
             flags=cv2.CASCADE_SCALE_IMAGE
         )
         
-        # Additional validation: check if detected faces are reasonable
+        # More lenient validation: check if detected faces are reasonable
         valid_faces = []
         face_sizes = []  # Track face sizes for age estimation
         
@@ -155,11 +155,11 @@ def check_face_opencv(image_bytes: bytes) -> dict:
             image_area = width * height
             face_ratio = face_area / image_area
             
-            # Face should be between 1% and 60% of image area (more lenient)
-            if 0.01 <= face_ratio <= 0.6:
-                # Face should be roughly square (width/height ratio between 0.6 and 1.5)
+            # More lenient: face should be between 0.5% and 70% of image area
+            if 0.005 <= face_ratio <= 0.7:
+                # More lenient aspect ratio: between 0.5 and 2.0 (allows more face angles)
                 aspect_ratio = w / h if h > 0 else 0
-                if 0.6 <= aspect_ratio <= 1.5:
+                if 0.5 <= aspect_ratio <= 2.0:
                     valid_faces.append((x, y, w, h))
                     face_sizes.append((w, h, face_ratio))
                     logger.debug(f"OpenCV: Valid face detected - size: {w}x{h}, ratio: {face_ratio:.3f}, aspect: {aspect_ratio:.2f}")
@@ -573,31 +573,30 @@ def moderate_photo(photo_job: dict) -> dict:
                 # But log a warning so we can investigate
                 logger.warning(f"⚠️ No age estimate available - approving (may need manual review)")
         
-        # Check NSFW - STRICT MULTI-LEVEL CHECKING
+        # Check NSFW - BALANCED CHECKING (allows swimsuits, rejects actual porn/nudity)
         porn_score = nsfw_result.get("porn", 0)
         sexy_score = nsfw_result.get("sexy", 0)
         hentai_score = nsfw_result.get("hentai", 0)
         
-        # Level 1: Safety net - reject if ANY NSFW category > 20%
-        if porn_score > NSFW_ANY_THRESHOLD or sexy_score > NSFW_ANY_THRESHOLD or hentai_score > NSFW_ANY_THRESHOLD:
-            # Level 2: Check specific thresholds
-            if porn_score > NSFW_PORN_THRESHOLD:
-                status = "rejected"
-                reason = "nsfw"
-                logger.info(f"❌ Rejected: NSFW PORN (score={porn_score:.3f} > threshold={NSFW_PORN_THRESHOLD})")
-            elif sexy_score > NSFW_SEXY_THRESHOLD:
-                status = "rejected"
-                reason = "nsfw"
-                logger.info(f"❌ Rejected: NSFW SEXY (score={sexy_score:.3f} > threshold={NSFW_SEXY_THRESHOLD})")
-            elif hentai_score > NSFW_HENTAI_THRESHOLD:
-                status = "rejected"
-                reason = "nsfw"
-                logger.info(f"❌ Rejected: NSFW HENTAI (score={hentai_score:.3f} > threshold={NSFW_HENTAI_THRESHOLD})")
-            else:
-                # Safety net: if any score > 20% but below specific thresholds, still reject for safety
-                status = "rejected"
-                reason = "nsfw"
-                logger.info(f"❌ Rejected: NSFW SAFETY NET (porn={porn_score:.3f}, sexy={sexy_score:.3f}, hentai={hentai_score:.3f})")
+        # Check specific thresholds - only reject if clearly explicit
+        if porn_score > NSFW_PORN_THRESHOLD:
+            status = "rejected"
+            reason = "nsfw"
+            logger.info(f"❌ Rejected: NSFW PORN (score={porn_score:.3f} > threshold={NSFW_PORN_THRESHOLD})")
+        elif hentai_score > NSFW_HENTAI_THRESHOLD:
+            status = "rejected"
+            reason = "nsfw"
+            logger.info(f"❌ Rejected: NSFW HENTAI (score={hentai_score:.3f} > threshold={NSFW_HENTAI_THRESHOLD})")
+        elif sexy_score > NSFW_SEXY_THRESHOLD:
+            # Only reject "sexy" if very high (allows swimsuits which are typically 40-60%)
+            status = "rejected"
+            reason = "nsfw"
+            logger.info(f"❌ Rejected: NSFW SEXY (score={sexy_score:.3f} > threshold={NSFW_SEXY_THRESHOLD})")
+        elif (porn_score > NSFW_ANY_THRESHOLD or sexy_score > NSFW_ANY_THRESHOLD or hentai_score > NSFW_ANY_THRESHOLD):
+            # Safety net: only reject if any category is very high (>45%) - allows swimsuits
+            status = "rejected"
+            reason = "nsfw"
+            logger.info(f"❌ Rejected: NSFW SAFETY NET (porn={porn_score:.3f}, sexy={sexy_score:.3f}, hentai={hentai_score:.3f} > {NSFW_ANY_THRESHOLD})")
         
         # Warn if NSFW scores are all zero (might indicate model not working)
         if (porn_score == 0.0 and sexy_score == 0.0 and hentai_score == 0.0):
