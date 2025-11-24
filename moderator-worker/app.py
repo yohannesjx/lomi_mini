@@ -39,11 +39,12 @@ S3_BUCKET_PHOTOS = os.getenv('S3_BUCKET_PHOTOS', 'lomi-photos')
 QUEUE_NAME = 'photo_moderation_queue'
 RESULTS_CHANNEL = 'moderation_results'
 
-# Moderation thresholds (relaxed for Ethiopian photos)
+# Moderation thresholds (STRICT for safety)
 BLUR_THRESHOLD = 120  # Laplacian variance
-NSFW_PORN_THRESHOLD = 0.35  # Lowered from 0.45 for better detection
-NSFW_SEXY_THRESHOLD = 0.55  # Lowered from 0.7 for better detection
-NSFW_HENTAI_THRESHOLD = 0.5  # Hentai threshold
+NSFW_PORN_THRESHOLD = 0.25  # Very strict - reject if porn > 25%
+NSFW_SEXY_THRESHOLD = 0.40  # Strict - reject if sexy > 40%
+NSFW_HENTAI_THRESHOLD = 0.30  # Strict - reject if hentai > 30%
+NSFW_ANY_THRESHOLD = 0.20  # Reject if ANY NSFW category > 20% (safety net)
 
 # Initialize Redis
 redis_client = redis.Redis(
@@ -374,6 +375,9 @@ def check_nsfw(image_bytes: bytes) -> dict:
         # Get probabilities - Falconsai model outputs: [drawings, hentai, neutral, porn, sexy]
         probs_list = probs[0].cpu().numpy().tolist()
         
+        # Log raw probabilities for debugging
+        logger.debug(f"NSFW model raw output: {probs_list} (length={len(probs_list)})")
+        
         # Falconsai model class indices (check model config for exact order):
         # Typically: 0=drawings, 1=hentai, 2=neutral, 3=porn, 4=sexy
         if len(probs_list) >= 5:
@@ -381,18 +385,28 @@ def check_nsfw(image_bytes: bytes) -> dict:
             porn_score = float(probs_list[3]) if len(probs_list) > 3 else 0.0
             sexy_score = float(probs_list[4]) if len(probs_list) > 4 else 0.0
             hentai_score = float(probs_list[1]) if len(probs_list) > 1 else 0.0
+            drawings_score = float(probs_list[0]) if len(probs_list) > 0 else 0.0
+            neutral_score = float(probs_list[2]) if len(probs_list) > 2 else 0.0
+            
+            logger.info(f"🔍 NSFW scores: porn={porn_score:.3f}, sexy={sexy_score:.3f}, hentai={hentai_score:.3f}, "
+                       f"neutral={neutral_score:.3f}, drawings={drawings_score:.3f}")
         elif len(probs_list) == 2:
             # Binary classification: [normal, nsfw]
             nsfw_score = float(probs_list[1])
             porn_score = nsfw_score * 0.5
             sexy_score = nsfw_score * 0.3
             hentai_score = nsfw_score * 0.2
+            logger.info(f"🔍 NSFW binary output: nsfw={nsfw_score:.3f} -> porn={porn_score:.3f}, sexy={sexy_score:.3f}, hentai={hentai_score:.3f}")
         else:
             # Fallback - log for debugging
-            logger.warning(f"Unexpected model output shape: {len(probs_list)} classes")
+            logger.warning(f"⚠️ Unexpected model output shape: {len(probs_list)} classes - raw: {probs_list}")
             porn_score = 0.0
             sexy_score = 0.0
             hentai_score = 0.0
+        
+        # Verify scores are reasonable (not all zeros)
+        if porn_score == 0.0 and sexy_score == 0.0 and hentai_score == 0.0:
+            logger.warning(f"⚠️ All NSFW scores are zero - model might not be working correctly")
         
         return {
             "porn": porn_score,
@@ -483,25 +497,40 @@ def moderate_photo(photo_job: dict) -> dict:
             reason = "underage"
             logger.info(f"❌ Rejected: underage (age={face_result.get('estimated_age')})")
         
-        # Check NSFW - LOWER THRESHOLDS for better detection
-        elif nsfw_result.get("porn", 0) > NSFW_PORN_THRESHOLD or nsfw_result.get("sexy", 0) > NSFW_SEXY_THRESHOLD:
-            status = "rejected"
-            reason = "nsfw"
-            logger.info(f"❌ Rejected: NSFW (porn={nsfw_result.get('porn', 0):.3f}, sexy={nsfw_result.get('sexy', 0):.3f})")
+        # Check NSFW - STRICT MULTI-LEVEL CHECKING
+        porn_score = nsfw_result.get("porn", 0)
+        sexy_score = nsfw_result.get("sexy", 0)
+        hentai_score = nsfw_result.get("hentai", 0)
         
-        # Additional NSFW check: if hentai score is high, also reject
-        elif nsfw_result.get("hentai", 0) > 0.5:  # Hentai threshold
-            status = "rejected"
-            reason = "nsfw"
-            logger.info(f"❌ Rejected: NSFW (hentai={nsfw_result.get('hentai', 0):.3f})")
+        # Level 1: Safety net - reject if ANY NSFW category > 20%
+        if porn_score > NSFW_ANY_THRESHOLD or sexy_score > NSFW_ANY_THRESHOLD or hentai_score > NSFW_ANY_THRESHOLD:
+            # Level 2: Check specific thresholds
+            if porn_score > NSFW_PORN_THRESHOLD:
+                status = "rejected"
+                reason = "nsfw"
+                logger.info(f"❌ Rejected: NSFW PORN (score={porn_score:.3f} > threshold={NSFW_PORN_THRESHOLD})")
+            elif sexy_score > NSFW_SEXY_THRESHOLD:
+                status = "rejected"
+                reason = "nsfw"
+                logger.info(f"❌ Rejected: NSFW SEXY (score={sexy_score:.3f} > threshold={NSFW_SEXY_THRESHOLD})")
+            elif hentai_score > NSFW_HENTAI_THRESHOLD:
+                status = "rejected"
+                reason = "nsfw"
+                logger.info(f"❌ Rejected: NSFW HENTAI (score={hentai_score:.3f} > threshold={NSFW_HENTAI_THRESHOLD})")
+            else:
+                # Safety net: if any score > 20% but below specific thresholds, still reject for safety
+                status = "rejected"
+                reason = "nsfw"
+                logger.info(f"❌ Rejected: NSFW SAFETY NET (porn={porn_score:.3f}, sexy={sexy_score:.3f}, hentai={hentai_score:.3f})")
         
         # Warn if NSFW scores are all zero (might indicate model not working)
-        if (nsfw_result.get("porn", 0) == 0.0 and 
-            nsfw_result.get("sexy", 0) == 0.0 and 
-            nsfw_result.get("hentai", 0) == 0.0):
+        if (porn_score == 0.0 and sexy_score == 0.0 and hentai_score == 0.0):
             logger.warning(f"⚠️ NSFW scores are all zero for {photo_job.get('media_id')} - model might not be working properly")
-            # If model is not working, be more conservative - check if image has suspicious characteristics
-            # For now, we'll trust the model, but log the warning
+            # If model is not working, reject for safety (better safe than sorry)
+            if status == "approved":
+                logger.warning(f"⚠️ Rejecting photo due to NSFW model failure (safety measure)")
+                status = "rejected"
+                reason = "nsfw_check_failed"
         
         if status == "approved":
             logger.info(f"✅ Approved: {photo_job.get('media_id')} (passed all checks)")
