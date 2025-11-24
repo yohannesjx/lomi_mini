@@ -1,11 +1,15 @@
 package handlers
 
 import (
+	"context"
+	"log"
+	"lomi-backend/internal/config"
 	"lomi-backend/internal/database"
 	"lomi-backend/internal/models"
 	"lomi-backend/internal/queue"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
