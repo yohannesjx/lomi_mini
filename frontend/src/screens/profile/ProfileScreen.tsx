@@ -1,16 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { CommonActions } from '@react-navigation/native';
 import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { useAuthStore } from '../../store/authStore';
+import { useOnboardingStore } from '../../store/onboardingStore';
 import { CoinService } from '../../api/services';
 
 export const ProfileScreen = ({ navigation }: any) => {
     const { user, logout } = useAuthStore();
+    const { reset: resetOnboarding } = useOnboardingStore();
     const [coinBalance, setCoinBalance] = useState(0);
     const [giftBalance, setGiftBalance] = useState(0);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     useEffect(() => {
         loadBalances();
@@ -27,11 +31,43 @@ export const ProfileScreen = ({ navigation }: any) => {
     };
 
     const handleLogout = async () => {
-        await logout();
-        navigation.reset({
-            index: 0,
-            routes: [{ name: 'Welcome' }],
-        });
+        // Show confirmation dialog
+        Alert.alert(
+            'Log Out',
+            'Are you sure you want to log out?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Log Out',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setIsLoggingOut(true);
+                            // Reset onboarding store
+                            resetOnboarding();
+                            // Logout from auth store (clears tokens and user data)
+                            await logout();
+                            
+                            // Navigate to Welcome screen using CommonActions for reliable navigation
+                            navigation.dispatch(
+                                CommonActions.reset({
+                                    index: 0,
+                                    routes: [{ name: 'Welcome' }],
+                                })
+                            );
+                        } catch (error: any) {
+                            console.error('Logout error:', error);
+                            Alert.alert('Error', 'Failed to log out. Please try again.');
+                        } finally {
+                            setIsLoggingOut(false);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const MenuItem = ({ icon, label, onPress, showArrow = true }: any) => (
@@ -165,10 +201,12 @@ export const ProfileScreen = ({ navigation }: any) => {
 
                 <View style={styles.logoutSection}>
                     <Button
-                        title="Log Out"
+                        title={isLoggingOut ? "Logging Out..." : "Log Out"}
                         onPress={handleLogout}
                         variant="outline"
                         size="large"
+                        disabled={isLoggingOut}
+                        isLoading={isLoggingOut}
                     />
                 </View>
             </ScrollView>
