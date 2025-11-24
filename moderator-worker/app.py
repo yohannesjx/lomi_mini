@@ -41,8 +41,9 @@ RESULTS_CHANNEL = 'moderation_results'
 
 # Moderation thresholds (relaxed for Ethiopian photos)
 BLUR_THRESHOLD = 120  # Laplacian variance
-NSFW_PORN_THRESHOLD = 0.45
-NSFW_SEXY_THRESHOLD = 0.7
+NSFW_PORN_THRESHOLD = 0.35  # Lowered from 0.45 for better detection
+NSFW_SEXY_THRESHOLD = 0.55  # Lowered from 0.7 for better detection
+NSFW_HENTAI_THRESHOLD = 0.5  # Hentai threshold
 
 # Initialize Redis
 redis_client = redis.Redis(
@@ -110,8 +111,9 @@ def check_face_opencv(image_bytes: bytes) -> dict:
             return {"has_face": False, "face_count": 0}
         
         height, width = img.shape[:2]
-        min_face_size = max(50, int(min(width, height) * 0.1))  # At least 10% of smaller dimension
-        max_face_size = int(min(width, height) * 0.8)  # Max 80% of smaller dimension
+        # More reasonable face size limits - allow smaller faces but validate them
+        min_face_size = max(30, int(min(width, height) * 0.05))  # At least 5% of smaller dimension (allows smaller faces)
+        max_face_size = int(min(width, height) * 0.9)  # Max 90% of smaller dimension
         
         # Convert to grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -119,43 +121,61 @@ def check_face_opencv(image_bytes: bytes) -> dict:
         # Load face cascade (OpenCV includes this)
         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
         
-        # VERY STRICT parameters to reduce false positives
-        # scaleFactor=1.3 (less sensitive), minNeighbors=6 (very strict), larger minSize
+        # Balanced parameters - not too strict, not too lenient
         faces = face_cascade.detectMultiScale(
             gray, 
-            scaleFactor=1.3,  # More conservative
-            minNeighbors=6,   # Require more neighbors (stricter)
-            minSize=(min_face_size, min_face_size),  # Minimum face size based on image
-            maxSize=(max_face_size, max_face_size),   # Maximum face size
+            scaleFactor=1.2,  # Balanced sensitivity
+            minNeighbors=4,   # Reasonable strictness (was 6, too strict)
+            minSize=(min_face_size, min_face_size),
+            maxSize=(max_face_size, max_face_size),
             flags=cv2.CASCADE_SCALE_IMAGE
         )
         
         # Additional validation: check if detected faces are reasonable
         valid_faces = []
+        face_sizes = []  # Track face sizes for age estimation
+        
         for (x, y, w, h) in faces:
             # Face should be reasonably sized relative to image
             face_area = w * h
             image_area = width * height
             face_ratio = face_area / image_area
             
-            # Face should be between 2% and 50% of image area
-            if 0.02 <= face_ratio <= 0.5:
-                # Face should be roughly square (width/height ratio between 0.7 and 1.4)
+            # Face should be between 1% and 60% of image area (more lenient)
+            if 0.01 <= face_ratio <= 0.6:
+                # Face should be roughly square (width/height ratio between 0.6 and 1.5)
                 aspect_ratio = w / h if h > 0 else 0
-                if 0.7 <= aspect_ratio <= 1.4:
+                if 0.6 <= aspect_ratio <= 1.5:
                     valid_faces.append((x, y, w, h))
+                    face_sizes.append((w, h, face_ratio))
+                    logger.debug(f"OpenCV: Valid face detected - size: {w}x{h}, ratio: {face_ratio:.3f}, aspect: {aspect_ratio:.2f}")
                 else:
                     logger.debug(f"OpenCV: Rejected face with bad aspect ratio {aspect_ratio:.2f}")
             else:
                 logger.debug(f"OpenCV: Rejected face with bad size ratio {face_ratio:.3f}")
         
         face_count = len(valid_faces)
-        logger.info(f"OpenCV face detection: found {len(faces)} candidate(s), {face_count} valid face(s) (image: {width}x{height})")
+        
+        # Estimate age from face size (rough heuristic: very small faces might be babies)
+        # Average adult face is typically 8-12% of image area in a portrait
+        # Baby faces are typically 3-6% of image area
+        estimated_age = None
+        if face_count > 0 and len(face_sizes) > 0:
+            avg_face_ratio = sum(size[2] for size in face_sizes) / len(face_sizes)
+            # If face is very small relative to image, likely a baby/child
+            if avg_face_ratio < 0.04:  # Less than 4% of image - likely underage
+                estimated_age = 12  # Conservative estimate
+                logger.info(f"OpenCV: Small face detected (ratio={avg_face_ratio:.3f}) - estimated age < 18")
+            elif avg_face_ratio < 0.06:  # Less than 6% - possibly underage
+                estimated_age = 16  # Conservative estimate
+                logger.info(f"OpenCV: Medium-small face detected (ratio={avg_face_ratio:.3f}) - estimated age ~16")
+        
+        logger.info(f"OpenCV face detection: found {len(faces)} candidate(s), {face_count} valid face(s) (image: {width}x{height}, estimated_age={estimated_age})")
         
         return {
             "has_face": face_count > 0,
             "face_count": face_count,
-            "estimated_age": None  # OpenCV can't estimate age
+            "estimated_age": estimated_age  # Return estimated age if available
         }
     except Exception as e:
         logger.error(f"OpenCV face detection failed: {e}")
@@ -438,9 +458,8 @@ def moderate_photo(photo_job: dict) -> dict:
             opencv_face_result = check_face_opencv(image_bytes)
             if opencv_face_result["has_face"]:
                 logger.info(f"✅ OpenCV fallback detected {opencv_face_result['face_count']} valid face(s)")
-                # Use OpenCV result (but note: no age estimation available)
+                # Use OpenCV result (includes age estimation if available)
                 face_result = opencv_face_result
-                # Continue to NSFW check (age check will be skipped since estimated_age is None)
             else:
                 logger.warning(f"❌ Both CompreFace and OpenCV failed - rejecting (no face detected)")
                 status = "rejected"
@@ -450,23 +469,37 @@ def moderate_photo(photo_job: dict) -> dict:
             reason = "no_face"
             logger.info(f"❌ Rejected: no face detected (face_count={face_result.get('face_count', 0)})")
         
-        # Check age
-        elif face_result["estimated_age"] and face_result["estimated_age"] < 18:
+        # Check for group photos (more than 1 face) - REJECT
+        elif face_result.get("face_count", 0) > 1:
+            status = "rejected"
+            reason = "group_photo"
+            logger.info(f"❌ Rejected: group photo detected ({face_result.get('face_count', 0)} faces - only single person photos allowed)")
+        
+        # Check age (including OpenCV age estimation)
+        elif face_result.get("estimated_age") and face_result["estimated_age"] < 18:
             status = "rejected"
             reason = "underage"
             logger.info(f"❌ Rejected: underage (age={face_result.get('estimated_age')})")
         
-        # Check NSFW
-        elif nsfw_result["porn"] > NSFW_PORN_THRESHOLD or nsfw_result["sexy"] > NSFW_SEXY_THRESHOLD:
+        # Check NSFW - LOWER THRESHOLDS for better detection
+        elif nsfw_result.get("porn", 0) > NSFW_PORN_THRESHOLD or nsfw_result.get("sexy", 0) > NSFW_SEXY_THRESHOLD:
             status = "rejected"
             reason = "nsfw"
-            logger.info(f"❌ Rejected: NSFW (porn={nsfw_result.get('porn'):.3f}, sexy={nsfw_result.get('sexy'):.3f})")
+            logger.info(f"❌ Rejected: NSFW (porn={nsfw_result.get('porn', 0):.3f}, sexy={nsfw_result.get('sexy', 0):.3f})")
+        
+        # Additional NSFW check: if hentai score is high, also reject
+        elif nsfw_result.get("hentai", 0) > 0.5:  # Hentai threshold
+            status = "rejected"
+            reason = "nsfw"
+            logger.info(f"❌ Rejected: NSFW (hentai={nsfw_result.get('hentai', 0):.3f})")
         
         # Warn if NSFW scores are all zero (might indicate model not working)
         if (nsfw_result.get("porn", 0) == 0.0 and 
             nsfw_result.get("sexy", 0) == 0.0 and 
             nsfw_result.get("hentai", 0) == 0.0):
-            logger.warning(f"⚠️ NSFW scores are all zero - model might not be working properly")
+            logger.warning(f"⚠️ NSFW scores are all zero for {photo_job.get('media_id')} - model might not be working properly")
+            # If model is not working, be more conservative - check if image has suspicious characteristics
+            # For now, we'll trust the model, but log the warning
         
         if status == "approved":
             logger.info(f"✅ Approved: {photo_job.get('media_id')} (passed all checks)")

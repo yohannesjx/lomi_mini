@@ -179,10 +179,11 @@ func sendSmartPush(result queue.ModerationResult) {
 
 func getReasonText(reason string) string {
 	reasons := map[string]string{
-		"blurry":   "ፎቶው ብዥ ነው!",
-		"no_face":  "ፊትሽን/ፊቱን አሳይን!",
-		"underage": "መታወቂያ ማረጋገጥ አለብህ (18+)",
-		"nsfw":     "ፎቶው ተገቢ አይደለም",
+		"blurry":     "ፎቶው ብዥ ነው!",
+		"no_face":    "ፊትሽን/ፊቱን አሳይን!",
+		"underage":   "መታወቂያ ማረጋገጥ አለብህ (18+)",
+		"nsfw":       "ፎቶው ተገቢ አይደለም",
+		"group_photo": "አንድ ሰው ብቻ ያለው ፎቶ ይፈልጋሉ",
 	}
 	if text, ok := reasons[reason]; ok {
 		return text
