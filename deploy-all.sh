@@ -74,8 +74,8 @@ echo ""
 
 # Step 2: Restart backend (Docker containers)
 echo "🔄 Step 2: Restarting backend..."
-echo "Stopping old containers..."
-docker-compose -f docker-compose.prod.yml --env-file .env.production down
+echo "Stopping old containers and removing orphans..."
+docker-compose -f docker-compose.prod.yml --env-file .env.production down --remove-orphans
 
 # Free port 8080 if needed
 echo "Freeing port 8080..."
