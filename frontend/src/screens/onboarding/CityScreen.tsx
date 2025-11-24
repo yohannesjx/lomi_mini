@@ -8,6 +8,7 @@ import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useAuthStore } from '../../store/authStore';
+import { TOTAL_ONBOARDING_STEPS } from '../../navigation/OnboardingNavigator';
 
 export const CityScreen = ({ navigation }: any) => {
     const [city, setCity] = useState('');

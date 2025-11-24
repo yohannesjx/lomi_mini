@@ -8,6 +8,7 @@ import { UserService } from '../../api/services';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useAuthStore } from '../../store/authStore';
 import { getTelegramWebApp } from '../../utils/telegram';
+import { TOTAL_ONBOARDING_STEPS } from '../../navigation/OnboardingNavigator';
 
 export const ProfileSetupScreen = ({ navigation }: any) => {
     const [name, setName] = useState('');
@@ -147,7 +148,7 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
             >
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.header}>
-                        <Text style={styles.stepIndicator}>Step 1 of 4</Text>
+                        <Text style={styles.stepIndicator}>Step 1 of {TOTAL_ONBOARDING_STEPS}</Text>
                         <Text style={styles.title}>Tell us about yourself</Text>
                         <Text style={styles.subtitle}>This info will be shown on your profile</Text>
                     </View>

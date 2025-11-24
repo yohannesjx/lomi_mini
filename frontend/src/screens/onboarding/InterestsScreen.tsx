@@ -6,6 +6,7 @@ import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
 import { useOnboardingStore } from '../../store/onboardingStore';
 import { useAuthStore } from '../../store/authStore';
+import { TOTAL_ONBOARDING_STEPS } from '../../navigation/OnboardingNavigator';
 
 const INTERESTS = [
     { id: 'buna', label: '☕ Buna Lover', category: 'Culture' },
@@ -80,7 +81,7 @@ export const InterestsScreen = ({ navigation }: any) => {
         <SafeAreaView style={styles.container}>
             <View style={styles.content}>
                 <View style={styles.header}>
-                    <Text style={styles.stepIndicator}>Step 3 of 4</Text>
+                    <Text style={styles.stepIndicator}>Step 7 of {TOTAL_ONBOARDING_STEPS}</Text>
                     <Text style={styles.title}>What are you into?</Text>
                     <Text style={styles.subtitle}>Pick up to 5 interests to find better matches</Text>
                 </View>

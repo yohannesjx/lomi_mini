@@ -8,6 +8,7 @@ import { BackButton } from '../../components/ui/BackButton';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
+import { TOTAL_ONBOARDING_STEPS } from '../../navigation/OnboardingNavigator';
 import axios from 'axios';
 
 interface PhotoData {
@@ -330,7 +331,7 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <BackButton />
                 <View style={styles.header}>
-                    <Text style={styles.stepIndicator}>Step 2 of 4</Text>
+                    <Text style={styles.stepIndicator}>Step 5 of {TOTAL_ONBOARDING_STEPS}</Text>
                     <Text style={styles.title}>Add your best photos</Text>
                     <Text style={styles.subtitle}>Upload at least 2 photos to start matching</Text>
                 </View>

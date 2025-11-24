@@ -6,6 +6,7 @@ import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { UserService } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
+import { TOTAL_ONBOARDING_STEPS } from '../../navigation/OnboardingNavigator';
 
 export const GenderPreferenceScreen = ({ navigation }: any) => {
     const [lookingFor, setLookingFor] = useState<'male' | 'female' | null>(null);
@@ -78,7 +79,7 @@ export const GenderPreferenceScreen = ({ navigation }: any) => {
         <SafeAreaView style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent}>
                 <View style={styles.header}>
-                    <Text style={styles.stepIndicator}>Step 4 of 4</Text>
+                    <Text style={styles.stepIndicator}>Step 3 of {TOTAL_ONBOARDING_STEPS}</Text>
                     <Text style={styles.title}>Who are you looking for?</Text>
                     <Text style={styles.subtitle}>This helps us show you the right matches</Text>
                 </View>

@@ -32,16 +32,19 @@ import { PhotoModerationStatusScreen } from '../screens/moderation/PhotoModerati
 
 const Stack = createStackNavigator();
 
+// Total number of onboarding steps (including completion screen)
+export const TOTAL_ONBOARDING_STEPS = 8;
+
 // Step mapping: onboarding_step -> screen name
 const STEP_TO_SCREEN: Record<number, string> = {
-    0: 'ProfileSetup',      // Age & Gender
-    1: 'City',              // City
-    2: 'GenderPreference',  // Looking for + Goal
-    3: 'Religion',          // Religion
-    4: 'PhotoUpload',       // Photos (at least 3)
-    5: 'Video',             // Video (optional)
-    6: 'Bio',               // Bio & Interests
-    7: 'OnboardingComplete', // Completion screen
+    0: 'ProfileSetup',      // Age & Gender - Step 1
+    1: 'City',              // City - Step 2
+    2: 'GenderPreference',  // Looking for + Goal - Step 3
+    3: 'Religion',          // Religion - Step 4
+    4: 'PhotoUpload',       // Photos (at least 3) - Step 5
+    5: 'Video',             // Video (optional) - Step 6
+    6: 'Bio',               // Bio & Interests - Step 7
+    7: 'OnboardingComplete', // Completion screen - Step 8
 };
 
 // Screen order for navigation

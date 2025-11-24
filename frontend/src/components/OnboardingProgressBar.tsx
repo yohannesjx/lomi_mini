@@ -8,7 +8,9 @@ interface OnboardingProgressBarProps {
     showStepNumbers?: boolean;
 }
 
-const TOTAL_STEPS = 8;
+import { TOTAL_ONBOARDING_STEPS } from '../navigation/OnboardingNavigator';
+
+const TOTAL_STEPS = TOTAL_ONBOARDING_STEPS;
 
 export const OnboardingProgressBar: React.FC<OnboardingProgressBarProps> = ({
     currentStep,
@@ -37,10 +39,7 @@ export const OnboardingProgressBar: React.FC<OnboardingProgressBarProps> = ({
             {showStepNumbers && (
                 <View style={styles.stepInfo}>
                     <Text style={styles.stepText}>
-                        Step {currentStep} of {totalSteps}
-                    </Text>
-                    <Text style={styles.progressText}>
-                        {Math.round((currentStep / totalSteps) * 100)}%
+                        Step {currentStep + 1} of {totalSteps}
                     </Text>
                 </View>
             )}
@@ -76,11 +75,6 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: COLORS.textSecondary,
         fontWeight: '500',
-    },
-    progressText: {
-        fontSize: 14,
-        color: COLORS.primary,
-        fontWeight: '600',
     },
     progressBarContainer: {
         width: '100%',
