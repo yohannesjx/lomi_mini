@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Circle, Polygon, Rect, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { GiftService } from '../../api/services';
 
@@ -119,10 +120,20 @@ export const GiftShopScreen = ({ navigation }: any) => {
     return (
         <View style={styles.container}>
             <SafeAreaView style={styles.safeArea} edges={['top']}>
+                {/* Header with back button */}
+                <View style={styles.topHeader}>
+                    <TouchableOpacity
+                        style={styles.backButton}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <Text style={styles.backIcon}>←</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Gift Shop</Text>
+                    <View style={styles.placeholder} />
+                </View>
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     {/* Header with coin balance */}
                     <View style={styles.header}>
-                        <Text style={styles.title}>Gift Shop</Text>
                         <View style={styles.balanceCard}>
                             <Text style={styles.balanceLabel}>Your Balance</Text>
                             <Text style={styles.balanceAmount}>
@@ -152,9 +163,7 @@ export const GiftShopScreen = ({ navigation }: any) => {
                                 }}
                             >
                                 <View style={styles.giftIcon}>
-                                    <Text style={styles.giftEmoji}>
-                                        {getGiftEmoji(gift.type)}
-                                    </Text>
+                                    {getGiftIcon(gift.type)}
                                 </View>
                                 <Text style={styles.giftName}>{gift.name}</Text>
                                 <Text style={styles.giftPrice}>
@@ -218,21 +227,142 @@ export const GiftShopScreen = ({ navigation }: any) => {
     );
 };
 
-const getGiftEmoji = (type: string): string => {
-    const emojiMap: Record<string, string> = {
-        rose: '🌹',
-        heart: '❤️',
-        diamond_ring: '💍',
-        fireworks: '🎆',
-        yacht: '🛥️',
-        sports_car: '🏎️',
-        private_jet: '✈️',
-        castle: '🏰',
-        universe: '🌌',
-        lomi_crown: '👑',
-    };
-    return emojiMap[type] || '🎁';
+// Fancy SVG Icons for Gifts
+const getGiftIcon = (type: string) => {
+    const size = 60;
+    const iconProps = { width: size, height: size };
+    
+    switch (type) {
+        case 'rose':
+            return <RoseIcon {...iconProps} />;
+        case 'heart':
+            return <HeartIcon {...iconProps} />;
+        case 'diamond_ring':
+            return <DiamondRingIcon {...iconProps} />;
+        case 'fireworks':
+            return <FireworksIcon {...iconProps} />;
+        case 'yacht':
+            return <YachtIcon {...iconProps} />;
+        case 'sports_car':
+            return <SportsCarIcon {...iconProps} />;
+        case 'private_jet':
+            return <PrivateJetIcon {...iconProps} />;
+        case 'castle':
+            return <CastleIcon {...iconProps} />;
+        case 'universe':
+            return <UniverseIcon {...iconProps} />;
+        case 'lomi_crown':
+            return <CrownIcon {...iconProps} />;
+        default:
+            return <GiftIcon {...iconProps} />;
+    }
 };
+
+// SVG Icon Components
+const RoseIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Path d="M12 2C8 6 4 8 4 12c0 4 3 6 8 6s8-2 8-6c0-4-4-6-8-10z" fill="#FF69B4" />
+        <Path d="M12 2c-2 2-4 4-4 6" stroke="#FF1493" strokeWidth="1.5" />
+        <Circle cx="12" cy="8" r="1.5" fill="#FFB6C1" />
+    </Svg>
+);
+
+const HeartIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Path
+            d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+            fill="#FF1744"
+        />
+    </Svg>
+);
+
+const DiamondRingIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Circle cx="12" cy="12" r="8" fill="#B9F2FF" stroke="#00D4FF" strokeWidth="2" />
+        <Path d="M8 12l2 2 4-4" stroke="#00D4FF" strokeWidth="2" strokeLinecap="round" />
+        <Rect x="6" y="18" width="12" height="2" rx="1" fill="#FFD700" />
+    </Svg>
+);
+
+const FireworksIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Circle cx="12" cy="8" r="2" fill="#FFD700" />
+        <Path d="M12 8l-3 6M12 8l3 6M12 8l-4 4M12 8l4 4" stroke="#FF6B00" strokeWidth="2" />
+        <Circle cx="8" cy="14" r="1.5" fill="#FF1744" />
+        <Circle cx="16" cy="14" r="1.5" fill="#00E676" />
+    </Svg>
+);
+
+const YachtIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Path d="M4 18l16-4v-2L4 16v2z" fill="#4FC3F7" />
+        <Path d="M6 16l12-3" stroke="#0277BD" strokeWidth="2" />
+        <Polygon points="8,14 12,12 16,14" fill="#81D4FA" />
+    </Svg>
+);
+
+const SportsCarIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Path d="M5 14h14v-2H5v2z" fill="#E91E63" />
+        <Circle cx="7" cy="17" r="2" fill="#212121" />
+        <Circle cx="17" cy="17" r="2" fill="#212121" />
+        <Path d="M6 12h12v-2H6v2z" fill="#F44336" />
+    </Svg>
+);
+
+const PrivateJetIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Path d="M12 2L4 8l8 6 8-6-8-6z" fill="#90CAF9" />
+        <Path d="M4 8l8 6v8l-8-6V8z" fill="#64B5F6" />
+        <Path d="M20 8l-8 6v8l8-6V8z" fill="#64B5F6" />
+        <Circle cx="12" cy="11" r="1.5" fill="#FFD700" />
+    </Svg>
+);
+
+const CastleIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Rect x="4" y="12" width="16" height="8" fill="#9E9E9E" />
+        <Rect x="6" y="8" width="4" height="4" fill="#757575" />
+        <Rect x="14" y="8" width="4" height="4" fill="#757575" />
+        <Rect x="9" y="4" width="6" height="4" fill="#616161" />
+        <Polygon points="10,4 12,2 14,4" fill="#FFD700" />
+    </Svg>
+);
+
+const UniverseIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Defs>
+            <SvgLinearGradient id="universeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <Stop offset="0%" stopColor="#1A237E" stopOpacity="1" />
+                <Stop offset="50%" stopColor="#7B1FA2" stopOpacity="1" />
+                <Stop offset="100%" stopColor="#E91E63" stopOpacity="1" />
+            </SvgLinearGradient>
+        </Defs>
+        <Circle cx="12" cy="12" r="10" fill="url(#universeGrad)" />
+        <Circle cx="8" cy="8" r="1" fill="#FFD700" />
+        <Circle cx="16" cy="10" r="0.8" fill="#FFD700" />
+        <Circle cx="10" cy="16" r="1.2" fill="#FFD700" />
+        <Circle cx="15" cy="16" r="0.6" fill="#FFD700" />
+    </Svg>
+);
+
+const CrownIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Path d="M5 16l7-8 7 8H5z" fill="#FFD700" />
+        <Path d="M5 16h14v2H5v-2z" fill="#FFC107" />
+        <Circle cx="8" cy="12" r="1.5" fill="#FF6B00" />
+        <Circle cx="12" cy="10" r="2" fill="#FF6B00" />
+        <Circle cx="16" cy="12" r="1.5" fill="#FF6B00" />
+    </Svg>
+);
+
+const GiftIcon = ({ width, height }: { width: number; height: number }) => (
+    <Svg width={width} height={height} viewBox="0 0 24 24" fill="none">
+        <Rect x="6" y="8" width="12" height="10" rx="1" fill="#E91E63" />
+        <Path d="M12 8V4M8 8H6M18 8h2" stroke="#C2185B" strokeWidth="2" />
+        <Path d="M12 8l-2-2M12 8l2-2" stroke="#C2185B" strokeWidth="2" />
+    </Svg>
+);
 
 const styles = StyleSheet.create({
     container: {
@@ -247,6 +377,31 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: COLORS.background,
+    },
+    topHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: SPACING.m,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.surfaceHighlight,
+    },
+    backButton: {
+        padding: SPACING.s,
+    },
+    backIcon: {
+        fontSize: 24,
+        color: COLORS.textPrimary,
+    },
+    headerTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: COLORS.textPrimary,
+        flex: 1,
+        textAlign: 'center',
+    },
+    placeholder: {
+        width: 40,
     },
     scrollContent: {
         padding: SPACING.l,
@@ -317,9 +472,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: SPACING.s,
-    },
-    giftEmoji: {
-        fontSize: 40,
+        borderWidth: 2,
+        borderColor: COLORS.primary,
     },
     giftName: {
         fontSize: 16,

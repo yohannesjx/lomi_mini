@@ -104,7 +104,7 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Text style={styles.backIcon}>←</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Buy Coins 💎 (NEW)</Text>
+                <Text style={styles.headerTitle}>Buy Coins 💎</Text>
                 <View style={styles.balanceBadge}>
                     <Text style={styles.balanceText}>💎 {coinBalance.toLocaleString()}</Text>
                 </View>
@@ -120,8 +120,7 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
                 {/* Coin Packages */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Choose Package (Luxury Packs)</Text>
-                    <Text style={styles.sectionSubtitle}>Spark → Universe: 600 LC to 100,000 LC</Text>
+                    <Text style={styles.sectionTitle}>Choose Package</Text>
                     {COIN_PACKAGES.map((pkg, index) => (
                         <TouchableOpacity
                             key={pkg.id || index}
@@ -187,12 +186,16 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                     </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Amount:</Text>
+                        <Text style={styles.summaryLabel}>Price:</Text>
                         <Text style={styles.summaryValueBold}>{selectedPackage.birr} ETB</Text>
                     </View>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Value:</Text>
+                        <Text style={styles.summaryLabel}>Coin Value:</Text>
                         <Text style={styles.summaryValue}>≈ {(selectedPackage.coins * 0.1).toFixed(0)} ETB</Text>
+                    </View>
+                    <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Rate:</Text>
+                        <Text style={styles.summaryValue}>1 LC = 0.1 ETB</Text>
                     </View>
                 </View>
                 </ScrollView>

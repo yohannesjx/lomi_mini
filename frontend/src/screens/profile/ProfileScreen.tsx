@@ -143,11 +143,6 @@ export const ProfileScreen = ({ navigation }: any) => {
                         onPress={() => navigation.navigate('BuyCoins')}
                     />
                     <MenuItem
-                        icon="💎"
-                        label="Buy Coins (New)"
-                        onPress={() => navigation.navigate('BuyCoins')}
-                    />
-                    <MenuItem
                         icon="🎁"
                         label="Gift Shop"
                         onPress={() => navigation.navigate('GiftShop')}
