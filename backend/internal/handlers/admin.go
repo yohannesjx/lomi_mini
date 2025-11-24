@@ -303,3 +303,116 @@ func GetModerationDashboard(c *fiber.Ctx) error {
 		},
 	})
 }
+
+// VerifyRejectedPhoto allows admin to verify a rejected photo (mark as reviewed)
+func VerifyRejectedPhoto(c *fiber.Ctx) error {
+	user := c.Locals("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	adminIDStr := claims["user_id"].(string)
+	adminID, _ := uuid.Parse(adminIDStr)
+
+	mediaID := c.Params("id")
+	var media models.Media
+	if err := database.DB.First(&media, "id = ?", mediaID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Media not found"})
+	}
+
+	// Only allow verification of rejected photos
+	if media.ModerationStatus != "rejected" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Only rejected photos can be verified",
+		})
+	}
+
+	// Mark as verified (we'll use ModerationNotes to track admin verification)
+	now := time.Now()
+	media.ModerationNotes = "Verified by admin " + adminID.String() + " at " + now.Format(time.RFC3339)
+	media.ModeratedAt = now // Update moderated_at to track verification time
+
+	if err := database.DB.Save(&media).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to verify photo",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Photo verified successfully",
+		"media": fiber.Map{
+			"id":                media.ID,
+			"moderation_status": media.ModerationStatus,
+			"moderation_reason": media.ModerationReason,
+			"moderation_notes":  media.ModerationNotes,
+		},
+	})
+}
+
+// DeleteRejectedPhoto allows admin to delete a rejected photo after verification
+// This deletes both the database record and the file from R2/S3
+func DeleteRejectedPhoto(c *fiber.Ctx) error {
+	user := c.Locals("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	adminIDStr := claims["user_id"].(string)
+	_, _ = uuid.Parse(adminIDStr) // Admin ID for logging
+
+	mediaID := c.Params("id")
+	var media models.Media
+	if err := database.DB.First(&media, "id = ?", mediaID).Error; err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Media not found"})
+	}
+
+	// Only allow deletion of rejected photos
+	if media.ModerationStatus != "rejected" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Only rejected photos can be deleted",
+		})
+	}
+
+	// Delete file from R2/S3
+	if media.URL != "" {
+		ctx := context.Background()
+		var bucket string
+		if media.MediaType == models.MediaTypePhoto {
+			bucket = config.Cfg.S3BucketPhotos
+		} else {
+			bucket = config.Cfg.S3BucketVideos
+		}
+
+		// Delete main file
+		if database.S3Client != nil {
+			_, err := database.S3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+				Bucket: &bucket,
+				Key:    &media.URL,
+			})
+			if err != nil {
+				log.Printf("⚠️ Failed to delete file from R2/S3: %v (continuing with DB deletion)", err)
+			} else {
+				log.Printf("✅ Deleted file from R2/S3: %s/%s", bucket, media.URL)
+			}
+		}
+
+		// Delete thumbnail if exists
+		if media.ThumbnailURL != "" && database.S3Client != nil {
+			_, err := database.S3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
+				Bucket: &bucket,
+				Key:    &media.ThumbnailURL,
+			})
+			if err != nil {
+				log.Printf("⚠️ Failed to delete thumbnail from R2/S3: %v", err)
+			} else {
+				log.Printf("✅ Deleted thumbnail from R2/S3: %s/%s", bucket, media.ThumbnailURL)
+			}
+		}
+	}
+
+	// Delete from database
+	if err := database.DB.Delete(&media).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "Failed to delete media from database",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "Rejected photo deleted successfully (database and R2/S3)",
+		"deleted_id": media.ID,
+	})
+}

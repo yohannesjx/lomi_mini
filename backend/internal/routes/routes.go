@@ -121,6 +121,8 @@ func SetupRoutes(app *fiber.App) {
 	// Photo Moderation Monitoring (Phase 3)
 	admin.Get("/queue-stats", handlers.GetQueueStats)
 	admin.Get("/moderation/dashboard", handlers.GetModerationDashboard)
+	admin.Put("/moderation/rejected/:id/verify", handlers.VerifyRejectedPhoto)
+	admin.Delete("/moderation/rejected/:id", handlers.DeleteRejectedPhoto)
 
 	// WebSocket (handles auth internally)
 	api.Get("/ws", websocket.New(handlers.HandleWebSocket))
