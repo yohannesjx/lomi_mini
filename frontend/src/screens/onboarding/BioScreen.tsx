@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { BackButton } from '../../components/ui/BackButton';
@@ -44,10 +44,12 @@ export const BioScreen = ({ navigation }: any) => {
     };
 
     return (
-        <SafeAreaView style={styles.container} edges={['top']}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                style={styles.keyboardView}
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                    style={styles.keyboardView}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
             >
                 <BackButton />
@@ -93,6 +95,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,
+    },
+    safeArea: {
+        flex: 1,
     },
     keyboardView: {
         flex: 1,

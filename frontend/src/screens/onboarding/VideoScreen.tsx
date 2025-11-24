@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
@@ -108,7 +108,8 @@ export const VideoScreen = ({ navigation }: any) => {
                     />
                 </View>
             </View>
-        </SafeAreaView>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -116,6 +117,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,
+    },
+    safeArea: {
+        flex: 1,
     },
     content: {
         flex: 1,

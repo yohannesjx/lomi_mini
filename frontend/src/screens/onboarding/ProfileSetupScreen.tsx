@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Image, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -141,11 +141,13 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                style={{ flex: 1 }}
-            >
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <KeyboardAvoidingView
+                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                    style={{ flex: 1 }}
+                >
                 <ScrollView contentContainerStyle={styles.scrollContent}>
                     <View style={styles.header}>
                         <Text style={styles.stepIndicator}>Step 1 of {TOTAL_ONBOARDING_STEPS}</Text>
@@ -194,8 +196,9 @@ export const ProfileSetupScreen = ({ navigation }: any) => {
                         />
                     </View>
                 </ScrollView>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
+                </KeyboardAvoidingView>
+            </SafeAreaView>
+        </View>
     );
 };
 

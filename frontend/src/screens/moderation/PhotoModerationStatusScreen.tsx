@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
 import {
     ActivityIndicator,
     Alert,
@@ -214,89 +215,93 @@ export const PhotoModerationStatusScreen = ({ navigation, route }: any) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
-            <View style={styles.header}>
-                <Text style={styles.title}>Photo Moderation</Text>
-                <Text style={styles.subtitle}>
-                    We review every photo automatically for blur, faces, age, and safety.
-                </Text>
-            </View>
-
-            {isLoading && !status ? (
-                <View style={styles.loadingState}>
-                    <ActivityIndicator size="large" color={COLORS.primary} />
-                    <Text style={styles.loadingText}>Checking your photos...</Text>
-                </View>
-            ) : (
-                <ScrollView
-                    contentContainerStyle={styles.scrollContent}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
-                    {error && (
-                        <View style={styles.errorBox}>
-                            <Text style={styles.errorText}>{error}</Text>
-                            <Button title="Try Again" onPress={() => loadStatus()} variant="outline" style={{ marginTop: SPACING.s }} />
-                        </View>
-                    )}
-
-                    <View style={styles.summaryCard}>
-                        <View style={styles.summaryRow}>
-                            <View style={styles.summaryItem}>
-                                <Text style={styles.summaryLabel}>Approved</Text>
-                                <Text style={styles.summaryValue}>{summary.approved}</Text>
-                            </View>
-                            <View style={styles.summaryItem}>
-                                <Text style={styles.summaryLabel}>Pending</Text>
-                                <Text style={styles.summaryValue}>{summary.pending}</Text>
-                            </View>
-                            <View style={styles.summaryItem}>
-                                <Text style={styles.summaryLabel}>Rejected</Text>
-                                <Text style={styles.summaryValue}>{summary.rejected}</Text>
-                            </View>
-                        </View>
-                        <Text style={styles.summaryHint}>
-                            {summary.approved >= 2
-                                ? 'You have enough approved photos to continue.'
-                                : 'Need at least 2 approved photos to unlock swiping.'}
-                        </Text>
-                        {summary.last_moderated_at && (
-                            <Text style={styles.lastUpdated}>Last update: {formatDateTime(summary.last_moderated_at)}</Text>
-                        )}
-                    </View>
-
-                    {!photos.length && (
-                        <View style={styles.emptyState}>
-                            <Text style={styles.emptyEmoji}>📷</Text>
-                            <Text style={styles.emptyTitle}>No photos yet</Text>
-                            <Text style={styles.emptyText}>Upload photos to start moderation.</Text>
-                        </View>
-                    )}
-
-                    {photos.map(renderPhotoCard)}
-                </ScrollView>
-            )}
-
-            <View style={styles.footer}>
-                <Button
-                    title={source === 'onboarding' ? 'Continue' : 'Done'}
-                    onPress={handleContinue}
-                    disabled={source === 'onboarding' ? !canContinue : false}
-                    isLoading={isCompleting}
-                    size="large"
-                />
-                <Button
-                    title="Upload more photos"
-                    onPress={handleUploadMore}
-                    variant="outline"
-                    size="large"
-                    style={{ marginTop: SPACING.s }}
-                />
-                {source === 'onboarding' && !canContinue && (
-                    <Text style={styles.helperText}>
-                        Need {Math.max(0, 2 - summary.approved)} more approved photo(s) to continue.
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <View style={styles.header}>
+                    <Text style={styles.title}>Photo Moderation</Text>
+                    <Text style={styles.subtitle}>
+                        We review every photo automatically for blur, faces, age, and safety.
                     </Text>
+                </View>
+
+                {isLoading && !status ? (
+                    <View style={styles.loadingState}>
+                        <ActivityIndicator size="large" color={COLORS.primary} />
+                        <Text style={styles.loadingText}>Checking your photos...</Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        style={styles.scrollView}
+                        contentContainerStyle={styles.scrollContent}
+                        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}>
+                        {error && (
+                            <View style={styles.errorBox}>
+                                <Text style={styles.errorText}>{error}</Text>
+                                <Button title="Try Again" onPress={() => loadStatus()} variant="outline" style={{ marginTop: SPACING.s }} />
+                            </View>
+                        )}
+
+                        <View style={styles.summaryCard}>
+                            <View style={styles.summaryRow}>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Approved</Text>
+                                    <Text style={styles.summaryValue}>{summary.approved}</Text>
+                                </View>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Pending</Text>
+                                    <Text style={styles.summaryValue}>{summary.pending}</Text>
+                                </View>
+                                <View style={styles.summaryItem}>
+                                    <Text style={styles.summaryLabel}>Rejected</Text>
+                                    <Text style={styles.summaryValue}>{summary.rejected}</Text>
+                                </View>
+                            </View>
+                            <Text style={styles.summaryHint}>
+                                {summary.approved >= 2
+                                    ? 'You have enough approved photos to continue.'
+                                    : 'Need at least 2 approved photos to unlock swiping.'}
+                            </Text>
+                            {summary.last_moderated_at && (
+                                <Text style={styles.lastUpdated}>Last update: {formatDateTime(summary.last_moderated_at)}</Text>
+                            )}
+                        </View>
+
+                        {!photos.length && (
+                            <View style={styles.emptyState}>
+                                <Text style={styles.emptyEmoji}>📷</Text>
+                                <Text style={styles.emptyTitle}>No photos yet</Text>
+                                <Text style={styles.emptyText}>Upload photos to start moderation.</Text>
+                            </View>
+                        )}
+
+                        {photos.map(renderPhotoCard)}
+                    </ScrollView>
                 )}
-            </View>
-        </SafeAreaView>
+
+                <View style={styles.footer}>
+                    <Button
+                        title={source === 'onboarding' ? 'Continue' : 'Done'}
+                        onPress={handleContinue}
+                        disabled={source === 'onboarding' ? !canContinue : false}
+                        isLoading={isCompleting}
+                        size="large"
+                    />
+                    <Button
+                        title="Upload more photos"
+                        onPress={handleUploadMore}
+                        variant="outline"
+                        size="large"
+                        style={{ marginTop: SPACING.s }}
+                    />
+                    {source === 'onboarding' && !canContinue && (
+                        <Text style={styles.helperText}>
+                            Need {Math.max(0, 2 - summary.approved)} more approved photo(s) to continue.
+                        </Text>
+                    )}
+                </View>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -305,10 +310,16 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: COLORS.background,
     },
+    safeArea: {
+        flex: 1,
+    },
     header: {
         paddingHorizontal: SPACING.l,
         paddingTop: SPACING.l,
         paddingBottom: SPACING.m,
+    },
+    scrollView: {
+        flex: 1,
     },
     title: {
         fontSize: 28,
@@ -332,7 +343,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: SPACING.l,
-        paddingBottom: SPACING.xxl,
+        paddingBottom: 200, // Extra padding for sticky footer
     },
     summaryCard: {
         backgroundColor: COLORS.surface,
@@ -455,10 +466,20 @@ const styles = StyleSheet.create({
         color: COLORS.textSecondary,
     },
     footer: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
         padding: SPACING.l,
+        paddingBottom: SPACING.l,
         borderTopWidth: 1,
         borderTopColor: COLORS.surfaceHighlight,
         backgroundColor: COLORS.background,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 5,
     },
     helperText: {
         marginTop: SPACING.s,

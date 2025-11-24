@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
@@ -78,7 +78,9 @@ export const InterestsScreen = ({ navigation }: any) => {
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
             <View style={styles.content}>
                 <View style={styles.header}>
                     <Text style={styles.stepIndicator}>Step 7 of {TOTAL_ONBOARDING_STEPS}</Text>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -327,8 +327,10 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
     );
 
     return (
-        <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.container}>
+            <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
+            <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+                <ScrollView contentContainerStyle={styles.scrollContent}>
                 <BackButton />
                 <View style={styles.header}>
                     <Text style={styles.stepIndicator}>Step 5 of {TOTAL_ONBOARDING_STEPS}</Text>
@@ -352,7 +354,8 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                     />
                 </View>
             </ScrollView>
-        </SafeAreaView>
+            </SafeAreaView>
+        </View>
     );
 };
 
@@ -360,6 +363,9 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: COLORS.background,
+    },
+    safeArea: {
+        flex: 1,
     },
     scrollContent: {
         flexGrow: 1,
