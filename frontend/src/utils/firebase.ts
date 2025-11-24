@@ -40,7 +40,16 @@ export const signInWithGoogleWeb = async (): Promise<{
     });
 
     const credential = await signInWithPopup(auth, provider);
-    const idToken = await credential.user.getIdToken(true);
+    
+    // Extract Google OAuth ID token (NOT Firebase ID token)
+    const googleCredential = GoogleAuthProvider.credentialFromResult(credential);
+    if (!googleCredential?.idToken) {
+        throw new Error('Failed to get Google ID token from credential');
+    }
+    
+    const idToken = googleCredential.idToken;
+    console.log('✅ Got Google OAuth ID token (not Firebase token)');
+    
     return { idToken, credential };
 };
 
