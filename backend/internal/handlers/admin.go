@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"log"
-	"lomi-backend/internal/config"
+	"lomi-backend/config"
 	"lomi-backend/internal/database"
 	"lomi-backend/internal/models"
 	"lomi-backend/internal/queue"
