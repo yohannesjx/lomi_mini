@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator, Alert, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import { Button } from '../../components/ui/Button';
 import { BackButton } from '../../components/ui/BackButton';
@@ -28,6 +29,34 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
     ]);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    const compressImage = async (uri: string): Promise<string> => {
+        try {
+            // Compress and resize image to reduce file size
+            // Max width: 1080px (good quality, reasonable size)
+            // Quality: 0.7 (good balance between quality and file size)
+            const manipulatedImage = await ImageManipulator.manipulateAsync(
+                uri,
+                [
+                    { resize: { width: 1080 } }, // Resize to max 1080px width (maintains aspect ratio)
+                ],
+                {
+                    compress: 0.7, // 70% quality (good balance)
+                    format: ImageManipulator.SaveFormat.JPEG, // Always use JPEG for smaller file size
+                }
+            );
+            
+            console.log('✅ Image compressed:', {
+                original: uri.substring(0, 50),
+                compressed: manipulatedImage.uri.substring(0, 50),
+            });
+            
+            return manipulatedImage.uri;
+        } catch (error) {
+            console.warn('⚠️ Image compression failed, using original:', error);
+            return uri; // Fallback to original if compression fails
+        }
+    };
+
     const pickImage = async (index: number) => {
         // Request permissions
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -40,16 +69,30 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             aspect: [4, 5],
-            quality: 0.8,
+            quality: 1.0, // Get full quality first, we'll compress it ourselves
         });
 
         if (!result.canceled && result.assets[0]) {
+            const originalUri = result.assets[0].uri;
             const newPhotos = [...photos];
-            newPhotos[index] = { uri: result.assets[0].uri, fileKey: null, isUploading: true };
+            newPhotos[index] = { uri: originalUri, fileKey: null, isUploading: true };
             setPhotos(newPhotos);
 
-            // Upload to backend
-            await uploadPhoto(result.assets[0].uri, index);
+            // Compress image before uploading
+            try {
+                const compressedUri = await compressImage(originalUri);
+                // Update with compressed URI for display
+                newPhotos[index] = { uri: compressedUri, fileKey: null, isUploading: true };
+                setPhotos(newPhotos);
+                
+                // Upload compressed image
+                await uploadPhoto(compressedUri, index);
+            } catch (error: any) {
+                console.error('Image processing error:', error);
+                Alert.alert('Error', 'Failed to process image. Please try again.');
+                newPhotos[index] = { uri: null, fileKey: null, isUploading: false };
+                setPhotos(newPhotos);
+            }
         }
     };
 
@@ -125,7 +168,6 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                         status: uploadResponse.status,
                         statusText: uploadResponse.statusText,
                         ok: uploadResponse.ok,
-                        headers: Object.fromEntries(uploadResponse.headers.entries()),
                     });
 
                     if (!uploadResponse.ok) {
@@ -245,41 +287,61 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
             // Extract batch_id from response (axios wraps in .data)
             const batchId = uploadCompleteResult?.batch_id || uploadCompleteResult?.data?.batch_id;
             
-            console.log('🔍 Extracted batchId:', batchId);
-            console.log('🧭 Navigation object type:', typeof navigation);
-            console.log('🧭 Navigation methods:', {
-                navigate: typeof navigation?.navigate,
-                replace: typeof navigation?.replace,
-                push: typeof navigation?.push,
-            });
+            if (!batchId) {
+                console.warn('⚠️ No batch_id in response, but continuing...');
+            }
             
-            // Navigate to status screen
+            // Navigate to status screen - use navigation from props or get it from navigation context
             const navParams = {
                 batchId: batchId,
-                photosCount: photosBatch.length,
                 source: 'onboarding',
             };
             
-            console.log('🧭 Attempting navigation to PhotoStatus with params:', navParams);
+            console.log('🧭 Navigating to PhotoStatus with params:', navParams);
             
-            // Try navigation - use replace to ensure it happens
-            if (navigation?.replace) {
-                console.log('✅ Using navigation.replace...');
-                navigation.replace('PhotoStatus', navParams);
-            } else if (navigation?.navigate) {
-                console.log('✅ Using navigation.navigate...');
-                navigation.navigate('PhotoStatus', navParams);
-            } else if (navigation?.push) {
-                console.log('✅ Using navigation.push...');
-                navigation.push('PhotoStatus', navParams);
-            } else {
-                console.error('❌ No navigation method available. Navigation object:', navigation);
-                Alert.alert(
-                    'Photos Uploaded',
-                    'Your photos are being reviewed. Please check your profile to see their status.',
-                    [{ text: 'OK' }]
-                );
-            }
+            // Use a small delay to ensure state updates are complete
+            setTimeout(() => {
+                try {
+                    // Try to get navigation from parent navigator if available
+                    const nav = navigation || (navigation as any)?.parent || (navigation as any)?.navigation;
+                    
+                    if (nav?.navigate) {
+                        console.log('✅ Using navigation.navigate...');
+                        nav.navigate('PhotoStatus', navParams);
+                    } else if (nav?.replace) {
+                        console.log('✅ Using navigation.replace...');
+                        nav.replace('PhotoStatus', navParams);
+                    } else if (nav?.push) {
+                        console.log('✅ Using navigation.push...');
+                        nav.push('PhotoStatus', navParams);
+                    } else {
+                        console.error('❌ No navigation method available');
+                        // Fallback: show alert and let user manually navigate
+                        Alert.alert(
+                            'Photos Uploaded',
+                            'Your photos are being reviewed. You can check their status in your profile.',
+                            [
+                                {
+                                    text: 'OK',
+                                    onPress: () => {
+                                        // Try to navigate to profile or back
+                                        if (nav?.goBack) {
+                                            nav.goBack();
+                                        }
+                                    }
+                                }
+                            ]
+                        );
+                    }
+                } catch (navError) {
+                    console.error('❌ Navigation error:', navError);
+                    Alert.alert(
+                        'Photos Uploaded',
+                        'Your photos are being reviewed. Please check your profile to see their status.',
+                        [{ text: 'OK' }]
+                    );
+                }
+            }, 100);
 
             // Photos still uploading will continue in background
             const stillUploading = photos.filter(p => p.uri !== null && p.fileKey === null && p.isUploading);
