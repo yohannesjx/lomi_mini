@@ -151,7 +151,8 @@ export const GenderPreferenceScreen = ({ navigation }: any) => {
                     />
                 </View>
             </ScrollView>
-        </SafeAreaView>
+            </SafeAreaView>
+        </View>
     );
 };
 
