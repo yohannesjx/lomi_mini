@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
-import { CoinService } from '../../api/services';
+import { GiftService } from '../../api/services';
 import { useAuthStore } from '../../store/authStore';
 
+// New luxury coin packs matching the spec
 const COIN_PACKAGES = [
-    { coins: 100, birr: 10, bonus: 0, popular: false },
-    { coins: 500, birr: 45, bonus: 50, popular: true },
-    { coins: 1000, birr: 80, bonus: 200, popular: false },
-    { coins: 2500, birr: 180, bonus: 750, popular: false },
-    { coins: 5000, birr: 320, bonus: 2000, popular: false },
-    { coins: 10000, birr: 600, bonus: 5000, popular: false },
+    { id: 'spark', name: 'Spark', coins: 600, birr: 55, popular: false },
+    { id: 'flame', name: 'Flame', coins: 1300, birr: 110, popular: true },
+    { id: 'blaze', name: 'Blaze', coins: 3500, birr: 275, popular: false },
+    { id: 'inferno', name: 'Inferno', coins: 8000, birr: 550, popular: false },
+    { id: 'galaxy', name: 'Galaxy', coins: 18000, birr: 1100, popular: false },
+    { id: 'universe', name: 'Universe', coins: 100000, birr: 5500, popular: false },
 ];
 
 const PAYMENT_METHODS = [
@@ -35,7 +36,7 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
 
     const loadCoinBalance = async () => {
         try {
-            const response = await CoinService.getBalance();
+            const response = await GiftService.getWalletBalance();
             setCoinBalance(response.coin_balance || 0);
         } catch (error: any) {
             console.error('Load coin balance error:', error);
@@ -47,15 +48,13 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
 
         setIsPurchasing(true);
         try {
-            const response = await CoinService.purchaseCoins({
-                coin_amount: selectedPackage.coins + selectedPackage.bonus,
-                payment_method: selectedPayment.id as 'telebirr' | 'cbe_birr',
-            });
+            // Use new luxury gift API
+            const response = await GiftService.buyCoins(selectedPackage.id);
 
-            // Mock payment flow - in production, redirect to payment gateway
+            // Show payment redirect alert
             Alert.alert(
                 'Payment Required',
-                `Redirecting to ${selectedPayment.name} to complete payment of ${selectedPackage.birr} Birr`,
+                `Redirecting to ${selectedPayment.name} to complete payment of ${selectedPackage.birr} ETB`,
                 [
                     {
                         text: 'Cancel',
@@ -65,23 +64,19 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                     {
                         text: 'Continue',
                         onPress: async () => {
-                            // Mock successful payment - in production, this would redirect to payment gateway
-                            // and the webhook would confirm the payment
+                            // In production, this would open the payment URL
+                            // For now, show success message
+                            // The webhook will add coins when payment is confirmed
                             try {
-                                // Simulate payment processing
-                                await new Promise(resolve => setTimeout(resolve, 2000));
-                                
-                                // In production, the payment gateway webhook would call ConfirmCoinPurchase
-                                // For now, we'll just show success and refresh balance
-                                // The actual coin addition happens via webhook in production
-                                
                                 Alert.alert(
-                                    'Payment Successful! 🎉',
-                                    `You received ${selectedPackage.coins + selectedPackage.bonus} coins!`,
+                                    'Payment Initiated! 🎉',
+                                    `Redirecting to payment gateway...\n\nYou will receive ${selectedPackage.coins.toLocaleString()} LC after payment confirmation.`,
                                     [
                                         {
                                             text: 'OK',
                                             onPress: async () => {
+                                                // In production: Open payment URL
+                                                // Linking.openURL(response.payment_url);
                                                 await loadCoinBalance();
                                                 navigation.goBack();
                                             },
@@ -111,7 +106,7 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Buy Coins 💎</Text>
                 <View style={styles.balanceBadge}>
-                    <Text style={styles.balanceText}>💎 {coinBalance}</Text>
+                    <Text style={styles.balanceText}>💎 {coinBalance.toLocaleString()}</Text>
                 </View>
             </View>
 
@@ -143,13 +138,11 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                             )}
                             <View style={styles.packageContent}>
                                 <View style={styles.packageLeft}>
-                                    <Text style={styles.coinAmount}>💎 {pkg.coins}</Text>
-                                    {pkg.bonus > 0 && (
-                                        <Text style={styles.bonusText}>+ {pkg.bonus} bonus</Text>
-                                    )}
+                                    <Text style={styles.packageName}>{pkg.name}</Text>
+                                    <Text style={styles.coinAmount}>💎 {pkg.coins.toLocaleString()} LC</Text>
                                 </View>
                                 <View style={styles.packageRight}>
-                                    <Text style={styles.birrAmount}>{pkg.birr} Birr</Text>
+                                    <Text style={styles.birrAmount}>{pkg.birr} ETB</Text>
                                 </View>
                             </View>
                         </TouchableOpacity>
@@ -184,23 +177,21 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                 {/* Summary */}
                 <View style={styles.summaryCard}>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Coins:</Text>
-                        <Text style={styles.summaryValue}>💎 {selectedPackage.coins}</Text>
+                        <Text style={styles.summaryLabel}>Package:</Text>
+                        <Text style={styles.summaryValue}>{selectedPackage.name}</Text>
                     </View>
-                    {selectedPackage.bonus > 0 && (
-                        <View style={styles.summaryRow}>
-                            <Text style={styles.summaryLabel}>Bonus:</Text>
-                            <Text style={styles.summaryValue}>💎 +{selectedPackage.bonus}</Text>
-                        </View>
-                    )}
+                    <View style={styles.summaryRow}>
+                        <Text style={styles.summaryLabel}>Coins:</Text>
+                        <Text style={styles.summaryValue}>💎 {selectedPackage.coins.toLocaleString()} LC</Text>
+                    </View>
                     <View style={styles.summaryDivider} />
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Total:</Text>
-                        <Text style={styles.summaryValueBold}>💎 {selectedPackage.coins + selectedPackage.bonus}</Text>
+                        <Text style={styles.summaryLabel}>Amount:</Text>
+                        <Text style={styles.summaryValueBold}>{selectedPackage.birr} ETB</Text>
                     </View>
                     <View style={styles.summaryRow}>
-                        <Text style={styles.summaryLabel}>Amount:</Text>
-                        <Text style={styles.summaryValueBold}>{selectedPackage.birr} Birr</Text>
+                        <Text style={styles.summaryLabel}>Value:</Text>
+                        <Text style={styles.summaryValue}>≈ {(selectedPackage.coins * 0.1).toFixed(0)} ETB</Text>
                     </View>
                 </View>
                 </ScrollView>
@@ -216,7 +207,7 @@ export const BuyCoinsScreen = ({ navigation, route }: any) => {
                         <ActivityIndicator color={COLORS.background} />
                     ) : (
                         <Text style={styles.purchaseButtonText}>
-                            Pay {selectedPackage.birr} Birr via {selectedPayment.name}
+                            Pay {selectedPackage.birr} ETB via {selectedPayment.name}
                         </Text>
                     )}
                 </TouchableOpacity>
@@ -336,16 +327,16 @@ const styles = StyleSheet.create({
     packageLeft: {
         flex: 1,
     },
+    packageName: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: COLORS.primary,
+        marginBottom: 4,
+    },
     coinAmount: {
         fontSize: 24,
         fontWeight: 'bold',
         color: COLORS.textPrimary,
-        marginBottom: 4,
-    },
-    bonusText: {
-        fontSize: 14,
-        color: COLORS.gold,
-        fontWeight: '600',
     },
     packageRight: {
         alignItems: 'flex-end',

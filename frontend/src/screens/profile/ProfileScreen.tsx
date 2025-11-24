@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { COLORS, SPACING, SIZES } from '../../theme/colors';
 import { useAuthStore } from '../../store/authStore';
 import { useOnboardingStore } from '../../store/onboardingStore';
-import { CoinService } from '../../api/services';
+import { GiftService } from '../../api/services';
 
 export const ProfileScreen = ({ navigation }: any) => {
     const { user, logout } = useAuthStore();
@@ -22,9 +22,11 @@ export const ProfileScreen = ({ navigation }: any) => {
 
     const loadBalances = async () => {
         try {
-            const response = await CoinService.getBalance();
+            const response = await GiftService.getWalletBalance();
             setCoinBalance(response.coin_balance || 0);
-            setGiftBalance(response.gift_balance || 0);
+            // Gift balance is now calculated from received gifts
+            // For now, show 0 or calculate from total_earned
+            setGiftBalance((response.total_earned || 0) * 0.1); // Convert coins to ETB
         } catch (error: any) {
             console.error('Load balances error:', error);
         }
@@ -111,13 +113,13 @@ export const ProfileScreen = ({ navigation }: any) => {
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>💎 {coinBalance}</Text>
+                        <Text style={styles.statValue}>💎 {coinBalance.toLocaleString()}</Text>
                         <Text style={styles.statLabel}>Coins</Text>
                     </View>
                     <View style={styles.statDivider} />
                     <View style={styles.statItem}>
-                        <Text style={styles.statValue}>🎁 {giftBalance.toFixed(0)}</Text>
-                        <Text style={styles.statLabel}>Gift Balance</Text>
+                        <Text style={styles.statValue}>🎁 {(coinBalance * 0.1).toFixed(0)}</Text>
+                        <Text style={styles.statLabel}>ETB Value</Text>
                     </View>
                 </View>
 
@@ -142,8 +144,11 @@ export const ProfileScreen = ({ navigation }: any) => {
                     />
                     <MenuItem
                         icon="🎁"
-                        label="My Gifts"
-                        onPress={() => {}}
+                        label="Gift Shop"
+                        onPress={() => {
+                            // Navigate to gift shop if registered, or show gift shop in modal
+                            Alert.alert('Gift Shop', 'Gift shop coming soon! Use the gift icon in chat to send gifts.');
+                        }}
                     />
                     <MenuItem
                         icon="💰"
