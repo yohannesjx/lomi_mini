@@ -468,19 +468,15 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                 uploadCompleteResult = await UserService.uploadComplete(photosBatch);
                 console.log('✅ Upload-complete response:', uploadCompleteResult);
                 
-                // Update onboarding step to 5 (photos done)
-                try {
-                    await updateStep(5);
-                    console.log('✅ Onboarding step updated to 5');
-                } catch (stepError: any) {
-                    console.warn('⚠️ Failed to update onboarding step, but continuing:', stepError);
-                    // Don't block navigation if step update fails
-                }
-                
-                // Navigate to next step (Video) or status screen
+                // Don't update step yet - wait until photos are approved in PhotoStatus screen
+                // Navigate to PhotoStatus screen to show moderation status
                 if (navigation && navigation.navigate) {
-                    console.log('🧭 Navigating to Video screen...');
-                    navigation.navigate('Video');
+                    console.log('🧭 Navigating to PhotoStatus screen...');
+                    const batchId = uploadCompleteResult?.batch_id || uploadCompleteResult?.data?.batch_id;
+                    navigation.navigate('PhotoStatus', {
+                        batchId: batchId,
+                        source: 'onboarding',
+                    });
                 } else {
                     console.error('❌ Navigation not available, trying fallback...');
                     navigateToStatusScreen(uploadCompleteResult);
@@ -491,23 +487,18 @@ export const PhotoUploadScreen = ({ navigation }: any) => {
                     console.warn('⚠️ Rate limit exceeded, but photos are uploaded. Continuing...');
                     const errorMessage = error?.response?.data?.message || 'Maximum 30 photos per 24 hours.';
                     
-                    // Update onboarding step even on rate limit (photos are uploaded)
-                    try {
-                        await updateStep(5);
-                        console.log('✅ Onboarding step updated to 5 (despite rate limit)');
-                    } catch (stepError: any) {
-                        console.warn('⚠️ Failed to update onboarding step:', stepError);
-                    }
-                    
-                    // Navigate to next step anyway (photos are already uploaded to R2)
+                    // Navigate to PhotoStatus screen anyway (photos are already uploaded to R2)
                     if (navigation && navigation.navigate) {
-                        console.log('🧭 Navigating to Video screen (rate limited but continuing)...');
-                        navigation.navigate('Video');
+                        console.log('🧭 Navigating to PhotoStatus screen (rate limited but continuing)...');
+                        navigation.navigate('PhotoStatus', {
+                            batchId: null, // No batch ID since upload-complete failed
+                            source: 'onboarding',
+                        });
                         // Show non-blocking message
                         setTimeout(() => {
                             Alert.alert(
                                 'Photo Limit Reached',
-                                errorMessage + '\n\nYour photos are uploaded and will be reviewed. You can continue with onboarding.',
+                                errorMessage + '\n\nYour photos are uploaded and will be reviewed. You can check their status here.',
                                 [{ text: 'OK' }]
                             );
                         }, 500);

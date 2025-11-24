@@ -85,7 +85,7 @@ export const PhotoModerationStatusScreen = ({ navigation, route }: any) => {
             setError(null);
             const pending = response.summary?.pending ?? 0;
             const approved = response.summary?.approved ?? 0;
-            setShouldAutoRefresh(pending > 0 || approved < 2);
+            setShouldAutoRefresh(pending > 0 || approved < 1);
         } catch (err: any) {
             console.error('Failed to load moderation status', err);
             const message = err?.response?.data?.error || err?.message || 'Failed to load moderation status';
@@ -130,12 +130,12 @@ export const PhotoModerationStatusScreen = ({ navigation, route }: any) => {
         return [...batchMatches, ...others];
     }, [status?.photos, batchId]);
 
-    const canContinue = summary.approved >= 2;
+    const canContinue = summary.approved >= 1; // Changed from 2 to 1 photo minimum
 
     const handleContinue = async () => {
         if (source === 'onboarding') {
             if (!canContinue) {
-                Alert.alert('Still pending', 'You need at least 2 approved photos to continue.');
+                Alert.alert('Still pending', 'You need at least 1 approved photo to continue.');
                 return;
             }
             try {
@@ -258,9 +258,9 @@ export const PhotoModerationStatusScreen = ({ navigation, route }: any) => {
                                 </View>
                             </View>
                             <Text style={styles.summaryHint}>
-                                {summary.approved >= 2
+                                {summary.approved >= 1
                                     ? 'You have enough approved photos to continue.'
-                                    : 'Need at least 2 approved photos to unlock swiping.'}
+                                    : 'Need at least 1 approved photo to unlock swiping.'}
                             </Text>
                             {summary.last_moderated_at && (
                                 <Text style={styles.lastUpdated}>Last update: {formatDateTime(summary.last_moderated_at)}</Text>
@@ -296,7 +296,7 @@ export const PhotoModerationStatusScreen = ({ navigation, route }: any) => {
                     />
                     {source === 'onboarding' && !canContinue && (
                         <Text style={styles.helperText}>
-                            Need {Math.max(0, 2 - summary.approved)} more approved photo(s) to continue.
+                            Need {Math.max(0, 1 - summary.approved)} more approved photo(s) to continue.
                         </Text>
                     )}
                 </View>
